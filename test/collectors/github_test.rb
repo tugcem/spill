@@ -269,6 +269,21 @@ class GithubCollectorTest < Minitest::Test
     assert(result.any? { |e| e.kind == :starred && e.repo == "someone/else" })
   end
 
+  def test_scoped_collect_matches_canonical_case_repo_against_downcased_scope
+    fresh = (Time.now - 3_600).utc.iso8601
+    events = [
+      { "type" => "IssuesEvent", "created_at" => fresh, "repo" => { "name" => "Acme/Proj" },
+        "payload" => { "action" => "closed", "issue" => { "number" => 7, "title" => "Case mismatch" } } }
+    ]
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: events))
+
+    result = collector.collect(window: WINDOW, scope: Set["acme/proj"])
+    kept = result.find { |e| e.kind == :issue_closed }
+
+    refute_nil kept
+    assert_equal "Acme/Proj", kept.repo # display string keeps the API's casing
+  end
+
   def test_malformed_payloads_are_skipped_not_raised
     fresh = (Time.now - 3_600).utc.iso8601
     events = [

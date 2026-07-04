@@ -53,7 +53,7 @@ module Spill
 
       def apply_scope(events, scope)
         events.select do |event|
-          event.kind == :starred || event.kind == :github_truncated || scope.include?(event.repo)
+          event.kind == :starred || event.kind == :github_truncated || scope.include?(event.repo.to_s.downcase)
         end
       end
 
