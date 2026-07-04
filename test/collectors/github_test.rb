@@ -83,6 +83,20 @@ class GithubCollectorTest < Minitest::Test
     assert_nil collector.collect(window: WINDOW)
   end
 
+  def test_malformed_payloads_are_skipped_not_raised
+    fresh = (Time.now - 3_600).utc.iso8601
+    events = [
+      gh_event("PullRequestEvent", fresh, action: "opened"),
+      gh_event("PullRequestEvent", nil, action: "opened",
+               pull_request: { "number" => 20, "title" => "No timestamp" })
+    ]
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: events))
+
+    result = collector.collect(window: WINDOW)
+
+    assert_equal [], result
+  end
+
   private
 
   def gh_event(type, created_at, action:, **payload)

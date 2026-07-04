@@ -86,6 +86,25 @@ class RendererTest < Minitest::Test
     assert_includes output, "\e[2mGitHub: skipped (gh not available)\e[0m"
   end
 
+  def test_empty_title_omits_dangling_em_dash
+    t = Time.new(2026, 7, 3, 10)
+    report = Spill::Report.build(
+      local: [],
+      github: [
+        Spill::Event.new(source: :github, kind: :pr_merged, repo: "acme/site", title: "",
+                         ref: "#12", timestamp: t + 120),
+        Spill::Event.new(source: :github, kind: :pr_open, repo: "acme/site", title: "",
+                         ref: "#14", timestamp: t + 180)
+      ],
+      repos: %w[bingo], window: WINDOW
+    )
+
+    output = Spill::Renderer.render(report, now: NOW)
+
+    assert_includes output, "merged PR #12 (acme/site)\n"
+    assert_includes output, "PR #14 open (acme/site)\n"
+  end
+
   private
 
   def commit(repo, title, branch, time)

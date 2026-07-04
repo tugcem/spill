@@ -34,6 +34,8 @@ module Spill
         events.concat(open_prs)
         events << truncation_event(raw) if truncated?(raw, window)
         events
+      rescue StandardError
+        nil
       end
 
       private
@@ -64,7 +66,10 @@ module Spill
 
       def map_event(item)
         repo = item.dig("repo", "name")
-        time = Time.parse(item["created_at"]).localtime
+        created = item["created_at"]
+        return nil if created.nil?
+
+        time = Time.parse(created).localtime
         case item["type"]
         when "PullRequestEvent" then map_pull_request(item, repo, time)
         when "PullRequestReviewEvent" then build(:review, item.dig("payload", "pull_request"), repo, time)
@@ -75,6 +80,8 @@ module Spill
 
       def map_pull_request(item, repo, time)
         pull = item.dig("payload", "pull_request")
+        return nil if pull.nil?
+
         case item.dig("payload", "action")
         when "opened" then build(:pr_opened, pull, repo, time)
         when "closed" then build(:pr_merged, pull, repo, time) if pull["merged"]
@@ -82,6 +89,8 @@ module Spill
       end
 
       def build(kind, subject, repo, time)
+        return nil if subject.nil?
+
         Event.new(source: :github, kind: kind, repo: repo, title: subject["title"],
                   ref: "##{subject["number"]}", timestamp: time)
       end

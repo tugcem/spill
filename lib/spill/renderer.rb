@@ -54,7 +54,11 @@ module Spill
     def github_line(event)
       verb = { pr_merged: "merged PR", pr_opened: "opened PR",
                review: "reviewed PR", issue_closed: "closed issue" }.fetch(event.kind)
-      "#{verb} #{event.ref} (#{event.repo}) — #{event.title}"
+      "#{verb} #{event.ref} (#{event.repo})#{title_suffix(event.title)}"
+    end
+
+    def title_suffix(title)
+      title.to_s.empty? ? "" : " — #{title}"
     end
 
     def doing_line(event)
@@ -68,7 +72,7 @@ module Spill
           "#{event.repo} · #{event.ref}: #{event.extra[:ahead]} unpushed #{event.extra[:ahead] == 1 ? "commit" : "commits"}"
         end
       when :pr_open
-        "PR #{event.ref.delete_prefix("#").prepend("#")} open (#{event.repo}) — #{event.title}"
+        "PR #{event.ref.delete_prefix("#").prepend("#")} open (#{event.repo})#{title_suffix(event.title)}"
       end
     end
 
