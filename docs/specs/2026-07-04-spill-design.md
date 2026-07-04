@@ -70,7 +70,8 @@ Adding L3–L5 later = new collector adapters + one new renderer. Zero core chan
 ```
 spill                      # scan current directory, window = today + yesterday
 spill ~/code               # scan a different root
-spill --since "3 days ago" # different window (any git-parseable date)
+spill --since "3 days ago" # different window: "yesterday", "N days/hours/weeks ago", or an ISO date
+                           # (one parser resolves the instant; git and GitHub use the same value)
 spill --author x@y.com     # override author (default: git config user.email)
 spill --no-github          # skip the GitHub layer
 ```

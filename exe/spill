@@ -1,0 +1,5 @@
+#!/usr/bin/env ruby
+
+require "spill"
+
+puts "spill #{Spill::VERSION} — CLI lands in v0.1"
