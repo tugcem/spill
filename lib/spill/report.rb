@@ -1,6 +1,6 @@
 module Spill
-  Report = Data.define(:window, :done, :github_done, :doing, :quiet, :notes) do
-    GITHUB_DONE_KINDS = %i[ pr_opened pr_merged review issue_closed ].freeze
+  Report = Data.define(:window, :done, :github_done, :doing, :quiet, :explored, :notes) do
+    GITHUB_DONE_KINDS = %i[ pr_opened pr_merged review issue_closed commented ].freeze
     LOCAL_STATE_KINDS = %i[ branch_wip dirty_tree ].freeze
 
     def self.build(local:, github:, repos:, window:)
@@ -15,6 +15,7 @@ module Spill
         github_done: github_events.select { |e| GITHUB_DONE_KINDS.include?(e.kind) }.sort_by(&:timestamp),
         doing: build_doing(state, github_events),
         quiet: repos - (commits.map(&:repo) + state.map(&:repo)).uniq,
+        explored: build_explored(github_events),
         notes: build_notes(github, github_events)
       )
     end
@@ -32,6 +33,15 @@ module Spill
       open_prs = github_events.select { |e| e.kind == :pr_open }
                               .sort_by(&:timestamp).reverse
       state.sort_by { |e| [ e.repo, e.kind.to_s ] } + open_prs
+    end
+
+    def self.build_explored(github_events)
+      github_events.select { |e| e.kind == :starred }
+                   .group_by(&:repo)
+                   .map { |repo, events| [ repo, events.map(&:timestamp).max ] }
+                   .sort_by { |_repo, time| time }
+                   .reverse
+                   .map(&:first)
     end
 
     def self.build_notes(github, github_events)

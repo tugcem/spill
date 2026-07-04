@@ -67,6 +67,47 @@ class ReportTest < Minitest::Test
     assert_equal [ "Earlier", "Later" ], report.github_done.map(&:title)
   end
 
+  def test_commented_events_are_in_github_done
+    t = Time.new(2026, 7, 3, 12)
+    github = [ Spill::Event.new(source: :github, kind: :commented, repo: "a/b", title: "Bug", ref: "#5", timestamp: t) ]
+
+    report = build(github: github)
+
+    assert_equal [ :commented ], report.github_done.map(&:kind)
+  end
+
+  def test_starred_events_populate_explored_not_done_or_doing
+    t = Time.new(2026, 7, 3, 12)
+    github = [
+      Spill::Event.new(source: :github, kind: :starred, repo: "nilbuild/git-standup", timestamp: t),
+      Spill::Event.new(source: :github, kind: :starred, repo: "mbailey/voicemode", timestamp: t + 60)
+    ]
+
+    report = build(github: github)
+
+    assert_empty report.github_done
+    assert_empty report.doing
+    assert_equal [ "mbailey/voicemode", "nilbuild/git-standup" ], report.explored
+  end
+
+  def test_explored_dedupes_repo_keeping_latest_timestamp
+    t = Time.new(2026, 7, 3, 12)
+    github = [
+      Spill::Event.new(source: :github, kind: :starred, repo: "a/b", timestamp: t),
+      Spill::Event.new(source: :github, kind: :starred, repo: "a/b", timestamp: t + 60)
+    ]
+
+    report = build(github: github)
+
+    assert_equal [ "a/b" ], report.explored
+  end
+
+  def test_explored_defaults_empty
+    report = build(github: [])
+
+    assert_empty report.explored
+  end
+
   private
 
   def commit(repo, title, branch, time)

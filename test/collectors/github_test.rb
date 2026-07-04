@@ -32,7 +32,7 @@ class GithubCollectorTest < Minitest::Test
     kinds = collector.collect(window: WINDOW).group_by(&:kind)
 
     assert_nil kinds[:pr_merged] # closed events no longer produce pr_merged
-    assert_equal [ "#14" ], kinds[:pr_opened].map(&:ref)
+    assert_nil kinds[:pr_opened] # opened events no longer produce pr_opened (search-based now)
     assert_equal [ "#87" ], kinds[:review].map(&:ref)
     assert_equal [ "#5" ], kinds[:issue_closed].map(&:ref)
     assert_nil kinds[:pr_open] # search stubbed empty
@@ -86,6 +86,115 @@ class GithubCollectorTest < Minitest::Test
     collector = Spill::Collectors::Github.new(runner: runner)
 
     assert_nil collector.collect(window: WINDOW)
+  end
+
+  def test_opened_pr_search_becomes_pr_opened_event
+    opened_search = { "items" => [ {
+      "number" => 14, "title" => "Add feed", "created_at" => Time.now.utc.iso8601,
+      "repository_url" => "https://api.github.com/repos/acme/proj"
+    } ] }
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: [], opened_search: opened_search))
+
+    opened = collector.collect(window: WINDOW).find { |e| e.kind == :pr_opened }
+
+    refute_nil opened
+    assert_equal "#14", opened.ref
+    assert_equal "acme/proj", opened.repo
+    assert_equal "Add feed", opened.title
+    assert_kind_of Time, opened.timestamp
+  end
+
+  def test_opened_pr_older_than_window_is_filtered_out
+    opened_search = { "items" => [ {
+      "number" => 99, "title" => "Ancient", "created_at" => (Time.now - (3 * 86_400)).utc.iso8601,
+      "repository_url" => "https://api.github.com/repos/acme/proj"
+    } ] }
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: [], opened_search: opened_search))
+
+    opened = collector.collect(window: WINDOW).find { |e| e.kind == :pr_opened }
+
+    assert_nil opened
+  end
+
+  def test_failed_opened_pr_search_makes_whole_layer_nil
+    runner = lambda do |args|
+      endpoint = args[1].to_s
+      if endpoint == "user"
+        [ JSON.generate({ "login" => "tugcem" }), true ]
+      elsif endpoint.include?("created:")
+        [ "", false ]
+      elsif endpoint.start_with?("search/issues")
+        [ JSON.generate({ "items" => [] }), true ]
+      else
+        [ JSON.generate([]), true ]
+      end
+    end
+    collector = Spill::Collectors::Github.new(runner: runner)
+
+    assert_nil collector.collect(window: WINDOW)
+  end
+
+  def test_issue_comment_event_becomes_commented
+    fresh = (Time.now - 3_600).utc.iso8601
+    events = [
+      { "type" => "IssueCommentEvent", "created_at" => fresh, "repo" => { "name" => "acme/proj" },
+        "payload" => { "action" => "created", "issue" => { "number" => 5, "title" => "Bug" } } }
+    ]
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: events))
+
+    commented = collector.collect(window: WINDOW).find { |e| e.kind == :commented }
+
+    refute_nil commented
+    assert_equal "#5", commented.ref
+    assert_equal "Bug", commented.title
+  end
+
+  def test_pull_request_review_comment_event_becomes_commented
+    fresh = (Time.now - 3_600).utc.iso8601
+    events = [
+      { "type" => "PullRequestReviewCommentEvent", "created_at" => fresh, "repo" => { "name" => "acme/proj" },
+        "payload" => { "action" => "created", "pull_request" => { "number" => 9, "title" => nil } } }
+    ]
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: events))
+
+    commented = collector.collect(window: WINDOW).find { |e| e.kind == :commented }
+
+    refute_nil commented
+    assert_equal "#9", commented.ref
+    assert_nil commented.title
+  end
+
+  def test_commented_events_on_same_thread_are_deduped_to_latest
+    older = (Time.now - 3_600).utc.iso8601
+    newer = (Time.now - 60).utc.iso8601
+    events = [
+      { "type" => "IssueCommentEvent", "created_at" => older, "repo" => { "name" => "acme/proj" },
+        "payload" => { "action" => "created", "issue" => { "number" => 5, "title" => "Bug" } } },
+      { "type" => "IssueCommentEvent", "created_at" => newer, "repo" => { "name" => "acme/proj" },
+        "payload" => { "action" => "created", "issue" => { "number" => 5, "title" => "Bug" } } }
+    ]
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: events))
+
+    commented = collector.collect(window: WINDOW).select { |e| e.kind == :commented }
+
+    assert_equal 1, commented.size
+    assert_equal Time.parse(newer).localtime, commented.first.timestamp
+  end
+
+  def test_watch_event_becomes_starred
+    fresh = (Time.now - 3_600).utc.iso8601
+    events = [
+      { "type" => "WatchEvent", "created_at" => fresh, "repo" => { "name" => "acme/proj" },
+        "payload" => { "action" => "started" } }
+    ]
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: events))
+
+    starred = collector.collect(window: WINDOW).find { |e| e.kind == :starred }
+
+    refute_nil starred
+    assert_equal "acme/proj", starred.repo
+    assert_nil starred.ref
+    assert_nil starred.title
   end
 
   def test_open_prs_become_pr_open_snapshot_events
@@ -152,13 +261,15 @@ class GithubCollectorTest < Minitest::Test
       "payload" => { "action" => action }.merge(payload.transform_keys(&:to_s)) }
   end
 
-  def runner_with(events:, search: { "items" => [] }, merged_search: { "items" => [] })
+  def runner_with(events:, search: { "items" => [] }, merged_search: { "items" => [] }, opened_search: { "items" => [] })
     lambda do |args|
       endpoint = args[1].to_s
       if endpoint == "user"
         [ JSON.generate({ "login" => "tugcem" }), true ]
       elsif endpoint.include?("merged:")
         [ JSON.generate(merged_search), true ]
+      elsif endpoint.include?("created:")
+        [ JSON.generate(opened_search), true ]
       elsif endpoint.start_with?("search/issues")
         [ JSON.generate(search), true ]
       elsif endpoint.start_with?("users/tugcem/events")

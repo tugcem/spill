@@ -28,14 +28,20 @@ module Spill
 
         events = raw.filter_map { |item| map_event(item) }
                     .select { |event| event.timestamp >= window.since }
+        events = dedupe_commented(events)
+
         open_prs = open_pr_events(login)
         return nil if open_prs.nil?
 
         merged_prs = merged_pr_events(login, window)
         return nil if merged_prs.nil?
 
+        opened_prs = opened_pr_events(login, window)
+        return nil if opened_prs.nil?
+
         events.concat(open_prs)
         events.concat(merged_prs)
+        events.concat(opened_prs)
         events << truncation_event(raw) if truncated?(raw, window)
         events
       rescue StandardError
@@ -75,20 +81,25 @@ module Spill
 
         time = Time.parse(created).localtime
         case item["type"]
-        when "PullRequestEvent" then map_pull_request(item, repo, time)
         when "PullRequestReviewEvent" then build(:review, item.dig("payload", "pull_request"), repo, time)
         when "IssuesEvent"
           build(:issue_closed, item.dig("payload", "issue"), repo, time) if item.dig("payload", "action") == "closed"
+        when "IssueCommentEvent"
+          build(:commented, item.dig("payload", "issue"), repo, time) if item.dig("payload", "action") == "created"
+        when "PullRequestReviewCommentEvent"
+          if item.dig("payload", "action") == "created"
+            build(:commented, item.dig("payload", "pull_request"), repo, time)
+          end
+        when "WatchEvent"
+          Event.new(source: :github, kind: :starred, repo: repo, timestamp: time) if item.dig("payload", "action") == "started"
         end
       end
 
-      def map_pull_request(item, repo, time)
-        pull = item.dig("payload", "pull_request")
-        return nil if pull.nil?
-
-        case item.dig("payload", "action")
-        when "opened" then build(:pr_opened, pull, repo, time)
-        end
+      def dedupe_commented(events)
+        commented, other = events.partition { |event| event.kind == :commented }
+        deduped = commented.group_by { |event| [ event.repo, event.ref ] }
+                           .map { |_key, group| group.max_by(&:timestamp) }
+        other + deduped
       end
 
       def build(kind, subject, repo, time)
@@ -127,6 +138,24 @@ module Spill
           next if time < window.since
 
           Event.new(source: :github, kind: :pr_merged,
+                    repo: item["repository_url"].to_s.split("/repos/").last,
+                    title: item["title"], ref: "##{item["number"]}", timestamp: time)
+        end
+      rescue JSON::ParserError
+        nil
+      end
+
+      def opened_pr_events(login, window)
+        since = window.since.strftime("%Y-%m-%d")
+        query = "search/issues?q=is:pr+author:#{login}+created:%3E=#{since}&per_page=50&advanced_search=true"
+        out, ok = @runner.call([ "api", query ])
+        return nil unless ok
+
+        JSON.parse(out).fetch("items", []).filter_map do |item|
+          time = Time.parse(item["created_at"]).localtime
+          next if time < window.since
+
+          Event.new(source: :github, kind: :pr_opened,
                     repo: item["repository_url"].to_s.split("/repos/").last,
                     title: item["title"], ref: "##{item["number"]}", timestamp: time)
         end

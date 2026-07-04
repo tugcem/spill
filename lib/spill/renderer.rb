@@ -11,6 +11,7 @@ module Spill
         lines.concat(doing_lines(report, color))
         lines.concat(quiet_lines(report, color))
       end
+      lines.concat(explored_lines(report, color))
       report.notes.each { |note| lines << "" << style(note, :dim, color) }
       lines.join("\n") << "\n"
     end
@@ -52,9 +53,15 @@ module Spill
     end
 
     def github_line(event)
-      verb = { pr_merged: "merged PR", pr_opened: "opened PR",
-               review: "reviewed PR", issue_closed: "closed issue" }.fetch(event.kind)
+      verb = { pr_merged: "merged PR", pr_opened: "opened PR", review: "reviewed PR",
+               issue_closed: "closed issue", commented: "commented on" }.fetch(event.kind)
       "#{verb} #{event.ref} (#{event.repo})#{title_suffix(event.title)}"
+    end
+
+    def explored_lines(report, color)
+      return [] if report.explored.empty?
+
+      [ "", style("Explored: #{report.explored.join(", ")}", :dim, color) ]
     end
 
     def title_suffix(title)

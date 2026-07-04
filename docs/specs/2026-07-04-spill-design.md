@@ -144,10 +144,22 @@ Walks the root for repos; per repo shells out to `git`:
 
 ### L2 collector — `Spill::Collectors::Github`
 
-One call: `gh api /users/<login>/events?per_page=100`, filtered to the window, mapped:
-- `PullRequestEvent` (opened / merged / closed) → `:pr_opened` / `:pr_merged`
-- `PullRequestReviewEvent` → `:review`
-- `IssuesEvent` (closed) → `:issue_closed`
+Two data sources, combined; either failing makes the whole layer `nil` (all-or-nothing):
+
+- **Events feed** — `gh api /users/<login>/events?per_page=100` (up to 3 pages),
+  filtered to the window, mapped:
+  - `PullRequestReviewEvent` → `:review`
+  - `IssuesEvent` (closed) → `:issue_closed`
+  - `IssueCommentEvent` / `PullRequestReviewCommentEvent` (created) → `:commented`
+    (deduped per thread, keeping the latest comment)
+  - `WatchEvent` (started) → `:starred`
+  - The events feed is actor-scoped and its `pull_request` payload is thin (no
+    title), so PR facts are *not* read from it — see ADR 0002.
+- **Search API** — three separate `gh api search/issues` calls, each all-or-nothing:
+  - `is:pr+author:<login>+created:>=<since>` → `:pr_opened` (titles included)
+  - `is:pr+author:<login>+merged:>=<since>` → `:pr_merged` (titles included,
+    correctly attributed to the PR author rather than whoever merged it)
+  - `is:pr+is:open+author:<login>` → `:pr_open` (open-PR snapshot for Doing)
 
 ### Entry point
 

@@ -105,6 +105,47 @@ class RendererTest < Minitest::Test
     assert_includes output, "PR #14 open (acme/site)\n"
   end
 
+  def test_renders_commented_and_explored
+    t = Time.new(2026, 7, 3, 10)
+    report = Spill::Report.build(
+      local: [],
+      github: [
+        Spill::Event.new(source: :github, kind: :commented, repo: "acme/site", title: "Fix nav",
+                         ref: "#12", timestamp: t),
+        Spill::Event.new(source: :github, kind: :starred, repo: "nilbuild/git-standup", timestamp: t + 10),
+        Spill::Event.new(source: :github, kind: :starred, repo: "mbailey/voicemode", timestamp: t + 20)
+      ],
+      repos: [], window: WINDOW
+    )
+
+    output = Spill::Renderer.render(report, now: NOW)
+
+    assert_includes output, "commented on #12 (acme/site) — Fix nav"
+    assert_includes output, "\nExplored: mbailey/voicemode, nilbuild/git-standup\n"
+  end
+
+  def test_explored_line_appears_with_nothing_to_spill
+    t = Time.new(2026, 7, 3, 10)
+    report = Spill::Report.build(
+      local: [],
+      github: [ Spill::Event.new(source: :github, kind: :starred, repo: "acme/site", timestamp: t) ],
+      repos: [], window: WINDOW
+    )
+
+    output = Spill::Renderer.render(report, now: NOW)
+
+    assert_includes output, "Nothing to spill. 🍵"
+    assert_includes output, "Explored: acme/site"
+  end
+
+  def test_no_explored_section_when_nothing_starred
+    report = Spill::Report.build(local: [], github: [], repos: [], window: WINDOW)
+
+    output = Spill::Renderer.render(report, now: NOW)
+
+    refute_includes output, "Explored:"
+  end
+
   private
 
   def commit(repo, title, branch, time)
