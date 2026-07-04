@@ -240,6 +240,35 @@ class GithubCollectorTest < Minitest::Test
     assert_nil collector.collect(window: WINDOW)
   end
 
+  def test_scoped_collect_keeps_in_scope_work_event_and_drops_out_of_scope
+    fresh = (Time.now - 3_600).utc.iso8601
+    events = [
+      gh_event("IssuesEvent", fresh, action: "closed",
+               issue: { "number" => 5, "title" => "In scope" }),
+      { "type" => "IssuesEvent", "created_at" => fresh, "repo" => { "name" => "other/proj" },
+        "payload" => { "action" => "closed", "issue" => { "number" => 6, "title" => "Out of scope" } } }
+    ]
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: events))
+
+    result = collector.collect(window: WINDOW, scope: Set["acme/proj"])
+    refs = result.select { |e| e.kind == :issue_closed }.map(&:ref)
+
+    assert_equal [ "#5" ], refs
+  end
+
+  def test_scoped_collect_keeps_starred_event_regardless_of_scope
+    fresh = (Time.now - 3_600).utc.iso8601
+    events = [
+      { "type" => "WatchEvent", "created_at" => fresh, "repo" => { "name" => "someone/else" },
+        "payload" => { "action" => "started" } }
+    ]
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: events))
+
+    result = collector.collect(window: WINDOW, scope: Set["acme/proj"])
+
+    assert(result.any? { |e| e.kind == :starred && e.repo == "someone/else" })
+  end
+
   def test_malformed_payloads_are_skipped_not_raised
     fresh = (Time.now - 3_600).utc.iso8601
     events = [

@@ -8,6 +8,8 @@
   events-feed payload didn't carry.
 - New coverage: `:commented` events (issue and PR review comments, deduped per
   thread) and an `Explored:` line for repos you starred.
+- GitHub work events are scoped to the repos under the scanned root (matched by
+  origin remote); starred repos stay global.
 
 ## [0.1.0] - 2026-07-04
 

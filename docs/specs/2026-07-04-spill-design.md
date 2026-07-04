@@ -120,8 +120,12 @@ Rules:
   GitHub layer as `merged PR #N`; including both would double-report.
 - Repos are ordered by recency (most recent commit first); the quiet-repo count
   line comes last.
-- GitHub activity in repos you don't have locally (e.g. reviews on never-cloned
-  repos) is included, labeled with its `org/name`.
+- GitHub **work events** (reviews, comments, issues closed, PRs opened/merged/open)
+  are scoped to the repos actually discovered under the scanned root, matched by
+  each local repo's **origin remote** (`org/name` slug) — not by folder basename.
+  Starred repos are exempt: the `Explored:` line stays global, since exploration
+  is inherently about other people's repos. (Decided 2026-07-04, after real-world
+  use showed GitHub activity from unrelated repos bleeding into a scoped report.)
 - The GitHub events fetch is capped at 3 pages / 300 events (API limit). If the
   window extends past the oldest fetched event, the report notes:
   `GitHub: may be incomplete before <date>`.

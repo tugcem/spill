@@ -19,7 +19,7 @@ module Spill
         @runner = runner
       end
 
-      def collect(window:)
+      def collect(window:, scope: nil)
         login = fetch_login
         return nil if login.nil?
 
@@ -43,12 +43,19 @@ module Spill
         events.concat(merged_prs)
         events.concat(opened_prs)
         events << truncation_event(raw) if truncated?(raw, window)
+        events = apply_scope(events, scope) unless scope.nil?
         events
       rescue StandardError
         nil
       end
 
       private
+
+      def apply_scope(events, scope)
+        events.select do |event|
+          event.kind == :starred || event.kind == :github_truncated || scope.include?(event.repo)
+        end
+      end
 
       def fetch_login
         out, ok = @runner.call([ "api", "user" ])
