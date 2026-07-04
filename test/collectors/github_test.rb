@@ -67,6 +67,22 @@ class GithubCollectorTest < Minitest::Test
     assert_kind_of Time, truncated.extra[:oldest]
   end
 
+  def test_failed_open_pr_search_makes_whole_layer_nil
+    runner = lambda do |args|
+      endpoint = args[1].to_s
+      if endpoint == "user"
+        [ JSON.generate({ "login" => "tugcem" }), true ]
+      elsif endpoint.start_with?("search/issues")
+        [ "", false ]
+      else
+        [ JSON.generate([]), true ]
+      end
+    end
+    collector = Spill::Collectors::Github.new(runner: runner)
+
+    assert_nil collector.collect(window: WINDOW)
+  end
+
   private
 
   def gh_event(type, created_at, action:, **payload)

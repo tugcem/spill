@@ -28,7 +28,10 @@ module Spill
 
         events = raw.filter_map { |item| map_event(item) }
                     .select { |event| event.timestamp >= window.since }
-        events.concat(open_pr_events(login))
+        open_prs = open_pr_events(login)
+        return nil if open_prs.nil?
+
+        events.concat(open_prs)
         events << truncation_event(raw) if truncated?(raw, window)
         events
       end
@@ -86,7 +89,7 @@ module Spill
       def open_pr_events(login)
         query = "search/issues?q=is:pr+is:open+author:#{login}&per_page=50&advanced_search=true"
         out, ok = @runner.call([ "api", query ])
-        return [] unless ok
+        return nil unless ok
 
         JSON.parse(out).fetch("items", []).map do |item|
           Event.new(source: :github, kind: :pr_open,
@@ -95,7 +98,7 @@ module Spill
                     timestamp: Time.parse(item["updated_at"]).localtime)
         end
       rescue JSON::ParserError
-        []
+        nil
       end
 
       def truncated?(raw, window)
