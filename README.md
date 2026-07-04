@@ -3,7 +3,8 @@
 Your standup, spilled. `spill` scans a folder of git repos and prints what you
 **did** and what you're **doing** — synthesized from local git and (optionally)
 your GitHub activity via the `gh` CLI. Not a commit dump: merged PRs, reviews
-you gave, branches in flight, uncommitted work.
+you gave, comments you left, branches in flight, uncommitted work — even the
+repos you starred along the way.
 
     $ cd ~/code && spill
 
@@ -16,6 +17,7 @@ you gave, branches in flight, uncommitted work.
       GitHub
         merged PR #12 (acme/website) — Fix nav
         reviewed PR #87 (acme/dashboard) — Payout calc
+        commented on #103 (acme/website) — Rate limiting rollout
 
     DOING
       icebreaker-bingo · feed-page: 3 unpushed commits
@@ -23,6 +25,8 @@ you gave, branches in flight, uncommitted work.
       PR #14 open (acme/website) — Live feed
 
     3 quiet repos skipped
+
+    Explored: nilbuild/git-standup
 
 ## Install
 
