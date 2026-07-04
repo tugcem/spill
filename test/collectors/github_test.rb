@@ -31,13 +31,61 @@ class GithubCollectorTest < Minitest::Test
 
     kinds = collector.collect(window: WINDOW).group_by(&:kind)
 
-    assert_equal [ "#12" ], kinds[:pr_merged].map(&:ref)
+    assert_nil kinds[:pr_merged] # closed events no longer produce pr_merged
     assert_equal [ "#14" ], kinds[:pr_opened].map(&:ref)
     assert_equal [ "#87" ], kinds[:review].map(&:ref)
     assert_equal [ "#5" ], kinds[:issue_closed].map(&:ref)
     assert_nil kinds[:pr_open] # search stubbed empty
-    assert_equal "acme/proj", kinds[:pr_merged].first.repo
-    assert_equal "Add card page", kinds[:pr_merged].first.title
+  end
+
+  def test_merged_pr_search_becomes_pr_merged_event
+    merged_search = { "items" => [ {
+      "number" => 12, "title" => "Add card page",
+      "pull_request" => { "merged_at" => Time.now.utc.iso8601 },
+      "closed_at" => Time.now.utc.iso8601,
+      "repository_url" => "https://api.github.com/repos/acme/proj"
+    } ] }
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: [], merged_search: merged_search))
+
+    merged = collector.collect(window: WINDOW).find { |e| e.kind == :pr_merged }
+
+    refute_nil merged
+    assert_equal "#12", merged.ref
+    assert_equal "acme/proj", merged.repo
+    assert_equal "Add card page", merged.title
+    assert_kind_of Time, merged.timestamp
+  end
+
+  def test_merged_pr_older_than_window_is_filtered_out
+    merged_search = { "items" => [ {
+      "number" => 99, "title" => "Ancient",
+      "pull_request" => { "merged_at" => (Time.now - (3 * 86_400)).utc.iso8601 },
+      "closed_at" => nil,
+      "repository_url" => "https://api.github.com/repos/acme/proj"
+    } ] }
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: [], merged_search: merged_search))
+
+    merged = collector.collect(window: WINDOW).find { |e| e.kind == :pr_merged }
+
+    assert_nil merged
+  end
+
+  def test_failed_merged_pr_search_makes_whole_layer_nil
+    runner = lambda do |args|
+      endpoint = args[1].to_s
+      if endpoint == "user"
+        [ JSON.generate({ "login" => "tugcem" }), true ]
+      elsif endpoint.include?("merged:")
+        [ "", false ]
+      elsif endpoint.start_with?("search/issues")
+        [ JSON.generate({ "items" => [] }), true ]
+      else
+        [ JSON.generate([]), true ]
+      end
+    end
+    collector = Spill::Collectors::Github.new(runner: runner)
+
+    assert_nil collector.collect(window: WINDOW)
   end
 
   def test_open_prs_become_pr_open_snapshot_events
@@ -104,11 +152,13 @@ class GithubCollectorTest < Minitest::Test
       "payload" => { "action" => action }.merge(payload.transform_keys(&:to_s)) }
   end
 
-  def runner_with(events:, search: { "items" => [] })
+  def runner_with(events:, search: { "items" => [] }, merged_search: { "items" => [] })
     lambda do |args|
       endpoint = args[1].to_s
       if endpoint == "user"
         [ JSON.generate({ "login" => "tugcem" }), true ]
+      elsif endpoint.include?("merged:")
+        [ JSON.generate(merged_search), true ]
       elsif endpoint.start_with?("search/issues")
         [ JSON.generate(search), true ]
       elsif endpoint.start_with?("users/tugcem/events")
