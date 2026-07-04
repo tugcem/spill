@@ -5,6 +5,7 @@ require_relative "spill/repo_finder"
 require_relative "spill/collectors/local_git"
 require_relative "spill/collectors/github"
 require_relative "spill/report"
+require_relative "spill/renderer"
 
 module Spill
   class Error < StandardError; end
