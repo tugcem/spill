@@ -40,6 +40,12 @@ class ReportTest < Minitest::Test
     assert_includes report.notes, "GitHub: skipped (gh not available)"
   end
 
+  def test_github_empty_produces_no_note
+    report = build(local: [], github: [], repos: [])
+
+    assert_empty report.notes
+  end
+
   def test_github_truncation_adds_incomplete_note
     github = [ Spill::Event.new(source: :github, kind: :github_truncated, repo: nil,
                                 extra: { oldest: Time.new(2026, 7, 1, 8) }) ]
