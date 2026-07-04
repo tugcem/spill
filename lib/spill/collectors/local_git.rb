@@ -52,7 +52,7 @@ module Spill
       end
 
       def git(path, *args)
-        out, status = Open3.capture2("git", "-C", path, *args)
+        out, _err, status = Open3.capture3("git", "-C", path, *args)
         status.success? ? out : nil
       rescue Errno::ENOENT
         nil

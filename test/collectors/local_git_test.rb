@@ -68,6 +68,13 @@ class LocalGitCommitsTest < Minitest::Test
     end
   end
 
+  def test_nonexistent_repo_path_degrades_silently
+    events = Spill::Collectors::LocalGit.new(repo_paths: [ "/nope/definitely-not-here" ])
+                                        .collect(window: WINDOW)
+
+    assert_empty events
+  end
+
   private
 
   def collect(repo)
