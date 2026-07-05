@@ -26,7 +26,7 @@ repos you starred along the way.
         feed-page: 3 unpushed commits
       acme/website
         uncommitted changes (4 files)
-        PR #14 open — Live feed · 7 months
+        PR #14 open — Live feed · 5 days
 
     3 quiet repos skipped
 

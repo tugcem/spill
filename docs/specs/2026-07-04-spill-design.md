@@ -115,7 +115,7 @@ DOING
     feed-page: 3 unpushed commits
   recyclesmart-website
     uncommitted changes (4 files)
-    PR #14 open — Live feed · 7 months
+    PR #14 open — Live feed · 5 days
 
 3 quiet repos skipped
 
@@ -149,7 +149,7 @@ Rules:
   undated note — `GitHub: search results may be incomplete (capped at 100)` — because
   search results are relevance-sorted, so a capped page has no chronological boundary.
   Both notes may appear together.
-- Open PRs in DOING carry an age annotation — `PR #804 open (org/repo) — Title · 7 months`
+- Open PRs in DOING carry an age annotation — `PR #1060 open (org/repo) — Title · 12 days`
   — computed from the PR's `created_at` against render time. (Decided 2026-07-04.)
 - Open PRs in DOING are window-relative, not an unwindowed snapshot: a PR appears only
   if it was created within the window or up to 14 days before `window.since` (the
