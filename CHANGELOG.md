@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+## [0.1.3] - 2026-07-05
+
+- Open PRs in DOING are now window-relative: shown only if created within the window
+  or up to 14 days before it. Stalled months-old PRs no longer haunt the report.
+
 ## [0.1.2] - 2026-07-05
 
 - Open PRs in DOING now show their age (`PR #804 open (org/repo) — Title · 7 months`),

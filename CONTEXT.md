@@ -16,7 +16,7 @@ Work performed during the window: commits (on any branch, merged or not), PRs me
 _Avoid_: completed, landed, finished
 
 **Doing**:
-In-flight work as of the moment the report runs: branches with unpushed commits, dirty working trees, your open PRs. A snapshot of current state, not windowed activity.
+In-flight work as of the moment the report runs: branches with unpushed commits, dirty working trees, your open PRs. Unpushed branches and dirty trees are a pure snapshot of current state, regardless of age. Open PRs are the exception: shown only when created within the window or up to 14 days before it (decided 2026-07-05, after real-world use showed months-old stalled PRs cluttering the report) — supersedes the pure-snapshot rule for PRs specifically.
 _Avoid_: WIP section, in-progress
 
 **Shipped**:

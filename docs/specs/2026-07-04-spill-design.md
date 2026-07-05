@@ -134,10 +134,15 @@ Rules:
   search results are relevance-sorted, so a capped page has no chronological boundary.
   Both notes may appear together.
 - Open PRs in DOING carry an age annotation — `PR #804 open (org/repo) — Title · 7 months`
-  — computed from the PR's `created_at` against render time. Doing itself stays an
-  unwindowed snapshot (an open PR shows regardless of when it was opened); the age
-  annotation is what makes staleness visible without changing that snapshot semantics.
-  (Decided 2026-07-04.)
+  — computed from the PR's `created_at` against render time. (Decided 2026-07-04.)
+- Open PRs in DOING are window-relative, not an unwindowed snapshot: a PR appears only
+  if it was created within the window or up to 14 days before `window.since` (the
+  `OPEN_PR_GRACE_SECONDS` grace period). A PR whose `created_at` predates that cutoff —
+  or is missing entirely — is dropped from the report; the age annotation above still
+  applies to whatever remains. Dirty trees and unpushed branches are unaffected — they
+  stay a pure, unwindowed snapshot. (Decided 2026-07-05, after real-world use showed
+  months-old stalled PRs cluttering the report; supersedes the pure-snapshot framing
+  for open PRs specifically.)
 - Repos with no activity collapse into one trailing "N quiet repos skipped" line.
 - Every dirty working tree appears in DOING, no matter how old the changes are —
   no staleness heuristics. (Decided 2026-07-04: honesty over magic.)
@@ -172,7 +177,8 @@ Two data sources, combined; either failing makes the whole layer `nil` (all-or-n
   - `is:pr+author:<login>+created:>=<since>` → `:pr_opened` (titles included)
   - `is:pr+author:<login>+merged:>=<since>` → `:pr_merged` (titles included,
     correctly attributed to the PR author rather than whoever merged it)
-  - `is:pr+is:open+author:<login>` → `:pr_open` (open-PR snapshot for Doing)
+  - `is:pr+is:open+author:<login>` → `:pr_open` (Doing; filtered to window + 14-day
+    grace on `created_at` — see the Doing rules above)
 
 ### Entry point
 

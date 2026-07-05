@@ -8,6 +8,8 @@ module Spill
       MAX_PAGES = 3
       PAGE_SIZE = 100
       SEARCH_PAGE_SIZE = 100
+      # An open PR is shown in Doing only if created in-window or up to 14 days before it.
+      OPEN_PR_GRACE_SECONDS = 14 * 86_400
 
       DEFAULT_RUNNER = lambda do |args|
         out, _err, status = Open3.capture3("gh", *args)
@@ -31,7 +33,7 @@ module Spill
                     .select { |event| event.timestamp >= window.since }
         events = dedupe_commented(events)
 
-        open_prs = open_pr_events(login)
+        open_prs = open_pr_events(login, window)
         return nil if open_prs.nil?
 
         merged_prs = merged_pr_events(login, window)
@@ -120,18 +122,23 @@ module Spill
                   ref: "##{subject["number"]}", timestamp: time)
       end
 
-      def open_pr_events(login)
+      def open_pr_events(login, window)
         query = "search/issues?q=is:pr+is:open+author:#{login}&per_page=#{SEARCH_PAGE_SIZE}&advanced_search=true"
         out, ok = @runner.call([ "api", query ])
         return nil unless ok
 
         items = JSON.parse(out).fetch("items", [])
-        events = items.map do |item|
-          extra = item["created_at"] ? { opened_at: Time.parse(item["created_at"]).localtime } : {}
+        cutoff = window.since - OPEN_PR_GRACE_SECONDS
+        events = items.filter_map do |item|
+          next if item["created_at"].nil?
+
+          opened_at = Time.parse(item["created_at"]).localtime
+          next if opened_at < cutoff
+
           Event.new(source: :github, kind: :pr_open,
                     repo: item["repository_url"].to_s.split("/repos/").last,
                     title: item["title"], ref: "##{item["number"]}",
-                    timestamp: Time.parse(item["updated_at"]).localtime, extra: extra)
+                    timestamp: Time.parse(item["updated_at"]).localtime, extra: { opened_at: opened_at })
         end
         events << search_cap_event(items)
         events.compact

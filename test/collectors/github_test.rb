@@ -200,6 +200,7 @@ class GithubCollectorTest < Minitest::Test
   def test_open_prs_become_pr_open_snapshot_events
     search = { "items" => [ {
       "number" => 14, "title" => "Add feed", "updated_at" => Time.now.utc.iso8601,
+      "created_at" => (Time.now - 3_600).utc.iso8601,
       "repository_url" => "https://api.github.com/repos/acme/proj"
     } ] }
     collector = Spill::Collectors::Github.new(runner: runner_with(events: [], search: search))
@@ -211,7 +212,7 @@ class GithubCollectorTest < Minitest::Test
   end
 
   def test_open_pr_events_include_opened_at_extra
-    created = (Time.now - (7 * 30 * 86_400)).utc.iso8601
+    created = (Time.now - (10 * 86_400)).utc.iso8601
     search = { "items" => [ {
       "number" => 14, "title" => "Add feed", "updated_at" => Time.now.utc.iso8601,
       "created_at" => created, "repository_url" => "https://api.github.com/repos/acme/proj"
@@ -223,16 +224,56 @@ class GithubCollectorTest < Minitest::Test
     assert_equal Time.parse(created).localtime, open_pr.extra[:opened_at]
   end
 
-  def test_open_pr_events_omit_opened_at_when_created_at_missing
+  def test_open_pr_created_within_window_is_kept
+    created = (Time.now - 3_600).utc.iso8601
+    search = { "items" => [ {
+      "number" => 14, "title" => "Add feed", "updated_at" => Time.now.utc.iso8601,
+      "created_at" => created, "repository_url" => "https://api.github.com/repos/acme/proj"
+    } ] }
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: [], search: search))
+
+    open_pr = collector.collect(window: WINDOW).find { |e| e.kind == :pr_open }
+
+    refute_nil open_pr
+  end
+
+  def test_open_pr_created_ten_days_before_window_since_is_kept_by_grace
+    created = (WINDOW.since - (10 * 86_400)).utc.iso8601
+    search = { "items" => [ {
+      "number" => 14, "title" => "Add feed", "updated_at" => Time.now.utc.iso8601,
+      "created_at" => created, "repository_url" => "https://api.github.com/repos/acme/proj"
+    } ] }
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: [], search: search))
+
+    open_pr = collector.collect(window: WINDOW).find { |e| e.kind == :pr_open }
+
+    refute_nil open_pr
+  end
+
+  def test_open_pr_created_thirty_days_before_window_since_is_dropped
+    created = (WINDOW.since - (30 * 86_400)).utc.iso8601
+    search = { "items" => [ {
+      "number" => 14, "title" => "Add feed", "updated_at" => Time.now.utc.iso8601,
+      "created_at" => created, "repository_url" => "https://api.github.com/repos/acme/proj"
+    } ] }
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: [], search: search))
+
+    open_pr = collector.collect(window: WINDOW).find { |e| e.kind == :pr_open }
+
+    assert_nil open_pr
+  end
+
+  def test_open_pr_missing_created_at_is_dropped_but_layer_stays_present
     search = { "items" => [ {
       "number" => 14, "title" => "Add feed", "updated_at" => Time.now.utc.iso8601,
       "repository_url" => "https://api.github.com/repos/acme/proj"
     } ] }
     collector = Spill::Collectors::Github.new(runner: runner_with(events: [], search: search))
 
-    open_pr = collector.collect(window: WINDOW).find { |e| e.kind == :pr_open }
+    result = collector.collect(window: WINDOW)
 
-    assert_nil open_pr.extra[:opened_at]
+    refute_nil result
+    assert_nil result.find { |e| e.kind == :pr_open }
   end
 
   def test_search_returning_exactly_100_items_flags_search_capped_not_truncated
