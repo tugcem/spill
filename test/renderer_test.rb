@@ -81,13 +81,56 @@ class RendererTest < Minitest::Test
 
   def test_color_mode_bolds_headers_and_dims_notes
     t = Time.new(2026, 7, 3, 10)
-    report = Spill::Report.build(local: [ commit("bingo", "X", "main", t) ],
-                                 github: nil, repos: [ "bingo" ], window: WINDOW)
+    report = Spill::Report.build(
+      local: [
+        commit("bingo", "X", "main", t),
+        Spill::Event.new(source: :local_git, kind: :dirty_tree, repo: "bingo", extra: { files: 1 })
+      ],
+      github: nil, repos: [ "bingo" ], window: WINDOW
+    )
 
     output = Spill::Renderer.render(report, color: true, now: NOW)
 
-    assert_includes output, "\e[1mDONE\e[0m"
+    assert_includes output, "\e[1;32mDONE\e[0m"
+    assert_includes output, "\e[1;33mDOING\e[0m"
+    assert_includes output, "\e[1;36mbingo\e[0m"
     assert_includes output, "\e[2mGitHub: skipped (gh not available)\e[0m"
+  end
+
+  def test_color_mode_dims_branch_count_line_and_age_suffix
+    t = Time.new(2026, 7, 3, 10)
+    report = Spill::Report.build(
+      local: [ commit("bingo", "X", "main", t) ],
+      github: [
+        Spill::Event.new(source: :github, kind: :pr_open, repo: "acme/site", title: "Feed",
+                         ref: "#14", timestamp: t + 180, extra: { opened_at: NOW - 3_600 })
+      ],
+      repos: [ "bingo" ], window: WINDOW
+    )
+
+    output = Spill::Renderer.render(report, color: true, now: NOW)
+
+    assert_includes output, "\e[2mmain · 1 commit\e[0m"
+    assert_includes output, "PR #14 open — Feed\e[2m · today\e[0m"
+  end
+
+  def test_color_false_emits_no_escape_codes
+    t = Time.new(2026, 7, 3, 10)
+    report = Spill::Report.build(
+      local: [
+        commit("bingo", "X", "main", t),
+        Spill::Event.new(source: :local_git, kind: :dirty_tree, repo: "bingo", extra: { files: 1 })
+      ],
+      github: [
+        Spill::Event.new(source: :github, kind: :pr_open, repo: "acme/site", title: "Feed",
+                         ref: "#14", timestamp: t + 180, extra: { opened_at: NOW - 3_600 })
+      ],
+      repos: [ "bingo" ], window: WINDOW
+    )
+
+    output = Spill::Renderer.render(report, color: false, now: NOW)
+
+    refute_includes output, "\e["
   end
 
   def test_empty_title_omits_dangling_em_dash

@@ -89,28 +89,44 @@ spill --no-github          # skip the GitHub layer
 
 Plain terminal text with subtle ANSI color, zero output dependencies:
 
+*(format as of v0.2.0 — commits and GitHub activity grouped per repo, an
+"opened and merged PR" collapse, and open-PR age suffixes)*
+
 ```
 spill · Fri Jul 4 · today + yesterday
 
 DONE
-  icebreaker-bingo · main · 7 commits
-    Scaffold Rails 8.1 app on Ruby 4.0.4
-    Add Player model with session token
-    Add prompts list and Card model
-    Add BingoDetector for 4x4 line detection
-    Add join flow with cookie-based player session
-    Add card page, square marking, and bingo events
-    Add QR code page
-  GitHub
-    merged PR #12 (recyclesmart-website)
-    reviewed PR #87 (resmart-dashboard)
+  icebreaker-bingo
+    main · 7 commits
+      Scaffold Rails 8.1 app on Ruby 4.0.4
+      Add Player model with session token
+      Add prompts list and Card model
+      Add BingoDetector for 4x4 line detection
+      Add join flow with cookie-based player session
+      Add card page, square marking, and bingo events
+      Add QR code page
+  recyclesmart-website
+    opened and merged PR #12 — Fix nav
+  resmart-dashboard
+    reviewed PR #87 — Payout calc
 
 DOING
-  icebreaker-bingo · feed-page: 3 unpushed commits
-  recyclesmart-website: uncommitted changes (4 files)
+  icebreaker-bingo
+    feed-page: 3 unpushed commits
+  recyclesmart-website
+    uncommitted changes (4 files)
+    PR #14 open — Live feed · 7 months
 
 3 quiet repos skipped
+
+Explored: nilbuild/git-standup
 ```
+
+In a terminal, `DONE`/`DOING` render bold green/yellow, repo subtitles bold
+cyan, and secondary lines (branch/count lines, age suffixes, the quiet-repo
+line, `Explored:`, notes) render dim; `NO_COLOR` and non-TTY output disable
+all of it. A teapot spinner animates on stderr while local git and GitHub
+data are being collected (v0.2.0+).
 
 Rules:
 - Commits grouped per repo, per branch; every subject shown, chronologically — no

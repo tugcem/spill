@@ -23,12 +23,12 @@ module Spill
     def done_lines(report, color)
       return [] if report.done.empty?
 
-      lines = [ "", style("DONE", :bold, color) ]
+      lines = [ "", style("DONE", :bold_green, color) ]
       report.done.each do |entry|
-        lines << "  #{entry[:repo]}"
+        lines << "  #{style(entry[:repo], :bold_cyan, color)}"
         entry[:branches].each do |branch|
           count = branch[:commits].size
-          lines << "    #{branch[:name]} · #{pluralize(count, "commit")}"
+          lines << "    #{style("#{branch[:name]} · #{pluralize(count, "commit")}", :dim, color)}"
           branch[:commits].each { |commit| lines << "      #{commit.title}" }
         end
         entry[:github].each { |event| lines << "    #{github_line(event)}" }
@@ -39,10 +39,10 @@ module Spill
     def doing_lines(report, color, now)
       return [] if report.doing.empty?
 
-      lines = [ "", style("DOING", :bold, color) ]
+      lines = [ "", style("DOING", :bold_yellow, color) ]
       report.doing.each do |entry|
-        lines << "  #{entry[:repo]}"
-        entry[:items].each { |event| lines << "    #{doing_line(event, now)}" }
+        lines << "  #{style(entry[:repo], :bold_cyan, color)}"
+        entry[:items].each { |event| lines << "    #{doing_line(event, now, color)}" }
       end
       lines
     end
@@ -70,7 +70,7 @@ module Spill
       title.to_s.empty? ? "" : " — #{title}"
     end
 
-    def doing_line(event, now)
+    def doing_line(event, now, color)
       case event.kind
       when :dirty_tree
         "uncommitted changes (#{pluralize(event.extra[:files], "file")})"
@@ -82,7 +82,11 @@ module Spill
         end
       when :pr_open
         line = "PR #{event.ref.delete_prefix("#").prepend("#")} open#{title_suffix(event.title)}"
-        event.extra[:opened_at] ? "#{line} · #{age(event.extra[:opened_at], now)}" : line
+        if event.extra[:opened_at]
+          "#{line}#{style(" · #{age(event.extra[:opened_at], now)}", :dim, color)}"
+        else
+          line
+        end
       end
     end
 
@@ -105,11 +109,18 @@ module Spill
       "#{count} #{count == 1 ? noun : "#{noun}s"}"
     end
 
+    STYLE_CODES = {
+      bold: "1",
+      dim: "2",
+      bold_green: "1;32",
+      bold_yellow: "1;33",
+      bold_cyan: "1;36"
+    }.freeze
+
     def style(text, kind, color)
       return text unless color
 
-      code = kind == :bold ? 1 : 2
-      "\e[#{code}m#{text}\e[0m"
+      "\e[#{STYLE_CODES.fetch(kind)}m#{text}\e[0m"
     end
   end
 end

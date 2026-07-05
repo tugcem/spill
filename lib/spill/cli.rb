@@ -23,7 +23,8 @@ module Spill
       args = parser.parse(argv)
       return 0 if early_exit
 
-      report = build_report(args, options)
+      spinner_enabled = $stderr.tty? && stdout.respond_to?(:tty?) && stdout.tty?
+      report = Spinner.around(enabled: spinner_enabled) { build_report(args, options) }
       color = stdout.respond_to?(:tty?) && stdout.tty? && ENV["NO_COLOR"].nil?
       stdout.puts Renderer.render(report, color: color)
       0

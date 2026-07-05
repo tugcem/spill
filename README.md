@@ -11,22 +11,32 @@ repos you starred along the way.
     spill · Fri Jul 4 · today + yesterday
 
     DONE
-      icebreaker-bingo · main · 7 commits
-        Scaffold Rails 8.1 app on Ruby 4.0.4
-        Add QR code page
-      GitHub
-        merged PR #12 (acme/website) — Fix nav
-        reviewed PR #87 (acme/dashboard) — Payout calc
-        commented on #103 (acme/website) — Rate limiting rollout
+      icebreaker-bingo
+        main · 2 commits
+          Scaffold Rails 8.1 app on Ruby 4.0.4
+          Add QR code page
+      acme/website
+        opened and merged PR #12 — Fix nav
+      acme/dashboard
+        reviewed PR #87 — Payout calc
+        commented on #103 — Rate limiting rollout
 
     DOING
-      icebreaker-bingo · feed-page: 3 unpushed commits
-      website: uncommitted changes (4 files)
-      PR #14 open (acme/website) — Live feed
+      icebreaker-bingo
+        feed-page: 3 unpushed commits
+      acme/website
+        uncommitted changes (4 files)
+        PR #14 open — Live feed · 7 months
 
     3 quiet repos skipped
 
     Explored: nilbuild/git-standup
+
+Everything is grouped per repo — commits and GitHub activity for a repo sit
+under one subtitle. In a terminal, `DONE`/`DOING` and repo subtitles are
+colored (green/yellow/cyan) and secondary lines are dimmed — set `NO_COLOR`
+or pipe the output to disable it. While spill is collecting local git and
+GitHub data, a small teapot spinner animates on stderr.
 
 ## Install
 

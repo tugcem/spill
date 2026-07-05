@@ -1,5 +1,19 @@
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-05
+
+- The report is now grouped per repo: commits and GitHub activity (merged/opened
+  PRs, reviews, comments, issues closed) for a repo appear together under one
+  subtitle, instead of local commits and a separate flat "GitHub" block.
+- A PR opened and merged within the same window collapses into a single
+  "opened and merged PR #N" line instead of two.
+- Colored output: `DONE` renders bold green, `DOING` bold yellow, repo
+  subtitles bold cyan, and branch/count lines, age suffixes, the quiet-repo
+  line, the `Explored:` line, and notes render dim — same as before when
+  color is off (non-TTY output or `NO_COLOR` set).
+- A teapot spinner (🫖 spilling the tea...) animates on stderr while spill
+  collects local git and GitHub data, when both stdout and stderr are a TTY.
+
 ## [0.1.3] - 2026-07-05
 
 - Open PRs in DOING are now window-relative: shown only if created within the window

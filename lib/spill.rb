@@ -7,6 +7,7 @@ require_relative "spill/collectors/local_git"
 require_relative "spill/collectors/github"
 require_relative "spill/report"
 require_relative "spill/renderer"
+require_relative "spill/spinner"
 require_relative "spill/cli"
 
 module Spill
