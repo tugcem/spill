@@ -52,7 +52,7 @@ module Spill
         nil
       end
     ensure
-      [ stdin, stdout, stderr ].each { |io| io&.close unless io.closed? }
+      [ stdin, stdout, stderr ].each { |io| io&.close unless io&.closed? }
     end
 
     def write_input(stdin, text)
