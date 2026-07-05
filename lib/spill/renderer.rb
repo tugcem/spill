@@ -8,7 +8,7 @@ module Spill
         lines << "" << "Nothing to spill. 🍵"
       else
         lines.concat(done_lines(report, color))
-        lines.concat(doing_lines(report, color))
+        lines.concat(doing_lines(report, color, now))
         lines.concat(quiet_lines(report, color))
       end
       lines.concat(explored_lines(report, color))
@@ -38,11 +38,11 @@ module Spill
       lines
     end
 
-    def doing_lines(report, color)
+    def doing_lines(report, color, now)
       return [] if report.doing.empty?
 
       [ "", style("DOING", :bold, color) ] +
-        report.doing.map { |event| "  #{doing_line(event)}" }
+        report.doing.map { |event| "  #{doing_line(event, now)}" }
     end
 
     def quiet_lines(report, color)
@@ -68,7 +68,7 @@ module Spill
       title.to_s.empty? ? "" : " — #{title}"
     end
 
-    def doing_line(event)
+    def doing_line(event, now)
       case event.kind
       when :dirty_tree
         "#{event.repo}: uncommitted changes (#{pluralize(event.extra[:files], "file")})"
@@ -79,7 +79,24 @@ module Spill
           "#{event.repo} · #{event.ref}: #{event.extra[:ahead]} unpushed #{event.extra[:ahead] == 1 ? "commit" : "commits"}"
         end
       when :pr_open
-        "PR #{event.ref.delete_prefix("#").prepend("#")} open (#{event.repo})#{title_suffix(event.title)}"
+        line = "PR #{event.ref.delete_prefix("#").prepend("#")} open (#{event.repo})#{title_suffix(event.title)}"
+        event.extra[:opened_at] ? "#{line} · #{age(event.extra[:opened_at], now)}" : line
+      end
+    end
+
+    def age(opened_at, now)
+      days = (now - opened_at) / 86_400
+      if days >= 365
+        years = (days / 365).floor
+        "#{years} #{years == 1 ? "year" : "years"}"
+      elsif days >= 30
+        "#{(days / 30).floor} months"
+      elsif days >= 7
+        "#{(days / 7).floor} weeks"
+      elsif days >= 1
+        "#{days.floor} days"
+      else
+        "today"
       end
     end
 

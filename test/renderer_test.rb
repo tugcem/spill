@@ -105,6 +105,54 @@ class RendererTest < Minitest::Test
     assert_includes output, "PR #14 open (acme/site)\n"
   end
 
+  def test_open_pr_age_annotation_shows_months_for_old_pr
+    t = Time.new(2026, 7, 3, 10)
+    report = Spill::Report.build(
+      local: [],
+      github: [
+        Spill::Event.new(source: :github, kind: :pr_open, repo: "acme/site", title: "Feed",
+                         ref: "#14", timestamp: t + 180, extra: { opened_at: NOW - (210 * 86_400) })
+      ],
+      repos: [], window: WINDOW
+    )
+
+    output = Spill::Renderer.render(report, now: NOW)
+
+    assert_includes output, "PR #14 open (acme/site) — Feed · 7 months\n"
+  end
+
+  def test_open_pr_without_opened_at_has_no_age_annotation
+    t = Time.new(2026, 7, 3, 10)
+    report = Spill::Report.build(
+      local: [],
+      github: [
+        Spill::Event.new(source: :github, kind: :pr_open, repo: "acme/site", title: "Feed",
+                         ref: "#14", timestamp: t + 180)
+      ],
+      repos: [], window: WINDOW
+    )
+
+    output = Spill::Renderer.render(report, now: NOW)
+
+    assert_includes output, "PR #14 open (acme/site) — Feed\n"
+  end
+
+  def test_open_pr_age_annotation_shows_today_for_fresh_pr
+    t = Time.new(2026, 7, 3, 10)
+    report = Spill::Report.build(
+      local: [],
+      github: [
+        Spill::Event.new(source: :github, kind: :pr_open, repo: "acme/site", title: "Feed",
+                         ref: "#14", timestamp: t + 180, extra: { opened_at: NOW - 3_600 })
+      ],
+      repos: [], window: WINDOW
+    )
+
+    output = Spill::Renderer.render(report, now: NOW)
+
+    assert_includes output, "PR #14 open (acme/site) — Feed · today\n"
+  end
+
   def test_renders_commented_and_explored
     t = Time.new(2026, 7, 3, 10)
     report = Spill::Report.build(

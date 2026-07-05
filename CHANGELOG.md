@@ -1,5 +1,17 @@
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-04
+
+- Open PRs in DOING now show their age (`PR #804 open (org/repo) — Title · 7 months`),
+  so a long-stale PR is visible at a glance instead of looking the same as one opened
+  yesterday.
+- Search results capped note: the three GitHub search calls (open/merged/opened PRs)
+  now request up to 100 results (was 50); if a search hits that cap, the report notes
+  `GitHub: may be incomplete before <date>`, same as the events-feed truncation note.
+- Test hardening: added regression coverage for cross-type comment dedupe (an
+  `IssueCommentEvent` and a `PullRequestReviewCommentEvent` on the same thread still
+  collapse to one `:commented` event).
+
 ## [0.1.1] - 2026-07-04
 
 - Merged PRs now sourced via the search API instead of the events feed, fixing

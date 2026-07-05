@@ -7,6 +7,7 @@ module Spill
     class Github
       MAX_PAGES = 3
       PAGE_SIZE = 100
+      SEARCH_PAGE_SIZE = 100
 
       DEFAULT_RUNNER = lambda do |args|
         out, _err, status = Open3.capture3("gh", *args)
@@ -117,27 +118,32 @@ module Spill
       end
 
       def open_pr_events(login)
-        query = "search/issues?q=is:pr+is:open+author:#{login}&per_page=50&advanced_search=true"
+        query = "search/issues?q=is:pr+is:open+author:#{login}&per_page=#{SEARCH_PAGE_SIZE}&advanced_search=true"
         out, ok = @runner.call([ "api", query ])
         return nil unless ok
 
-        JSON.parse(out).fetch("items", []).map do |item|
+        items = JSON.parse(out).fetch("items", [])
+        events = items.map do |item|
+          extra = item["created_at"] ? { opened_at: Time.parse(item["created_at"]).localtime } : {}
           Event.new(source: :github, kind: :pr_open,
                     repo: item["repository_url"].to_s.split("/repos/").last,
                     title: item["title"], ref: "##{item["number"]}",
-                    timestamp: Time.parse(item["updated_at"]).localtime)
+                    timestamp: Time.parse(item["updated_at"]).localtime, extra: extra)
         end
+        events << maybe_truncation_event(items) { |item| item["updated_at"] }
+        events.compact
       rescue JSON::ParserError
         nil
       end
 
       def merged_pr_events(login, window)
         since = window.since.strftime("%Y-%m-%d")
-        query = "search/issues?q=is:pr+author:#{login}+merged:%3E=#{since}&per_page=50&advanced_search=true"
+        query = "search/issues?q=is:pr+author:#{login}+merged:%3E=#{since}&per_page=#{SEARCH_PAGE_SIZE}&advanced_search=true"
         out, ok = @runner.call([ "api", query ])
         return nil unless ok
 
-        JSON.parse(out).fetch("items", []).filter_map do |item|
+        items = JSON.parse(out).fetch("items", [])
+        events = items.filter_map do |item|
           merged_at = item.dig("pull_request", "merged_at") || item["closed_at"]
           next if merged_at.nil?
 
@@ -148,17 +154,20 @@ module Spill
                     repo: item["repository_url"].to_s.split("/repos/").last,
                     title: item["title"], ref: "##{item["number"]}", timestamp: time)
         end
+        events << maybe_truncation_event(items) { |item| item.dig("pull_request", "merged_at") || item["closed_at"] }
+        events.compact
       rescue JSON::ParserError
         nil
       end
 
       def opened_pr_events(login, window)
         since = window.since.strftime("%Y-%m-%d")
-        query = "search/issues?q=is:pr+author:#{login}+created:%3E=#{since}&per_page=50&advanced_search=true"
+        query = "search/issues?q=is:pr+author:#{login}+created:%3E=#{since}&per_page=#{SEARCH_PAGE_SIZE}&advanced_search=true"
         out, ok = @runner.call([ "api", query ])
         return nil unless ok
 
-        JSON.parse(out).fetch("items", []).filter_map do |item|
+        items = JSON.parse(out).fetch("items", [])
+        events = items.filter_map do |item|
           time = Time.parse(item["created_at"]).localtime
           next if time < window.since
 
@@ -166,8 +175,19 @@ module Spill
                     repo: item["repository_url"].to_s.split("/repos/").last,
                     title: item["title"], ref: "##{item["number"]}", timestamp: time)
         end
+        events << maybe_truncation_event(items) { |item| item["created_at"] }
+        events.compact
       rescue JSON::ParserError
         nil
+      end
+
+      def maybe_truncation_event(items)
+        return nil unless items.size == SEARCH_PAGE_SIZE
+
+        oldest = items.filter_map { |item| yield(item) }.map { |raw| Time.parse(raw) }.min
+        return nil if oldest.nil?
+
+        Event.new(source: :github, kind: :github_truncated, repo: nil, extra: { oldest: oldest.localtime })
       end
 
       def truncated?(raw, window)
