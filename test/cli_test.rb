@@ -14,7 +14,8 @@ class CLITest < Minitest::Test
 
       assert_equal 0, status
       assert_includes out.string, "DONE"
-      assert_includes out.string, "proj · main · 1 commit"
+      assert_includes out.string, "  proj\n"
+      assert_includes out.string, "main · 1 commit"
       assert_includes out.string, "Add widget"
       assert_includes out.string, "1 quiet repo skipped"
       refute_includes out.string, "\e[" # StringIO is not a TTY: no color

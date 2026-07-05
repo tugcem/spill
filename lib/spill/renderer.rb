@@ -17,23 +17,21 @@ module Spill
     end
 
     def empty?(report)
-      report.done.empty? && report.github_done.empty? && report.doing.empty?
+      report.done.empty? && report.doing.empty?
     end
 
     def done_lines(report, color)
-      return [] if report.done.empty? && report.github_done.empty?
+      return [] if report.done.empty?
 
       lines = [ "", style("DONE", :bold, color) ]
       report.done.each do |entry|
+        lines << "  #{entry[:repo]}"
         entry[:branches].each do |branch|
           count = branch[:commits].size
-          lines << "  #{entry[:repo]} · #{branch[:name]} · #{pluralize(count, "commit")}"
-          branch[:commits].each { |commit| lines << "    #{commit.title}" }
+          lines << "    #{branch[:name]} · #{pluralize(count, "commit")}"
+          branch[:commits].each { |commit| lines << "      #{commit.title}" }
         end
-      end
-      if report.github_done.any?
-        lines << "  GitHub"
-        report.github_done.each { |event| lines << "    #{github_line(event)}" }
+        entry[:github].each { |event| lines << "    #{github_line(event)}" }
       end
       lines
     end
@@ -41,8 +39,12 @@ module Spill
     def doing_lines(report, color, now)
       return [] if report.doing.empty?
 
-      [ "", style("DOING", :bold, color) ] +
-        report.doing.map { |event| "  #{doing_line(event, now)}" }
+      lines = [ "", style("DOING", :bold, color) ]
+      report.doing.each do |entry|
+        lines << "  #{entry[:repo]}"
+        entry[:items].each { |event| lines << "    #{doing_line(event, now)}" }
+      end
+      lines
     end
 
     def quiet_lines(report, color)
@@ -53,9 +55,9 @@ module Spill
     end
 
     def github_line(event)
-      verb = { pr_merged: "merged PR", pr_opened: "opened PR", review: "reviewed PR",
-               issue_closed: "closed issue", commented: "commented on" }.fetch(event.kind)
-      "#{verb} #{event.ref} (#{event.repo})#{title_suffix(event.title)}"
+      verb = { pr_merged: "merged PR", pr_opened: "opened PR", pr_opened_and_merged: "opened and merged PR",
+               review: "reviewed PR", issue_closed: "closed issue", commented: "commented on" }.fetch(event.kind)
+      "#{verb} #{event.ref}#{title_suffix(event.title)}"
     end
 
     def explored_lines(report, color)
@@ -71,15 +73,15 @@ module Spill
     def doing_line(event, now)
       case event.kind
       when :dirty_tree
-        "#{event.repo}: uncommitted changes (#{pluralize(event.extra[:files], "file")})"
+        "uncommitted changes (#{pluralize(event.extra[:files], "file")})"
       when :branch_wip
         if event.extra[:no_upstream]
-          "#{event.repo} · #{event.ref}: not pushed yet (#{pluralize(event.extra[:unpushed], "commit")})"
+          "#{event.ref}: not pushed yet (#{pluralize(event.extra[:unpushed], "commit")})"
         else
-          "#{event.repo} · #{event.ref}: #{event.extra[:ahead]} unpushed #{event.extra[:ahead] == 1 ? "commit" : "commits"}"
+          "#{event.ref}: #{event.extra[:ahead]} unpushed #{event.extra[:ahead] == 1 ? "commit" : "commits"}"
         end
       when :pr_open
-        line = "PR #{event.ref.delete_prefix("#").prepend("#")} open (#{event.repo})#{title_suffix(event.title)}"
+        line = "PR #{event.ref.delete_prefix("#").prepend("#")} open#{title_suffix(event.title)}"
         event.extra[:opened_at] ? "#{line} · #{age(event.extra[:opened_at], now)}" : line
       end
     end

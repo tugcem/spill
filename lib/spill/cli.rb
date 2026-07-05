@@ -37,13 +37,14 @@ module Spill
       repo_paths = RepoFinder.find(args.first || Dir.pwd)
       local = Collectors::LocalGit.new(repo_paths: repo_paths, author: options[:author])
                                   .collect(window: window)
-      github = options[:github] ? fetch_github(repo_paths, window) : []
+      repo_map = RepoRemotes.slug_map(repo_paths)
+      github = options[:github] ? fetch_github(repo_map, window) : []
       Report.build(local: local, github: github,
-                   repos: repo_paths.map { |path| File.basename(path) }, window: window)
+                   repos: repo_paths.map { |path| File.basename(path) }, window: window, repo_map: repo_map)
     end
 
-    def self.fetch_github(repo_paths, window)
-      scope = RepoRemotes.github_slugs(repo_paths)
+    def self.fetch_github(repo_map, window)
+      scope = repo_map.keys.to_set
       Collectors::Github.new.collect(window: window, scope: scope)
     end
   end

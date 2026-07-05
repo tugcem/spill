@@ -27,16 +27,20 @@ class RendererTest < Minitest::Test
       spill · Sat Jul 4 · today + yesterday
 
       DONE
-        bingo · main · 2 commits
-          Add card page
-          Add QR page
-        GitHub
-          merged PR #12 (acme/site) — Fix nav
+        acme/site
+          merged PR #12 — Fix nav
+        bingo
+          main · 2 commits
+            Add card page
+            Add QR page
 
       DOING
-        bingo · feed: 3 unpushed commits
-        site: uncommitted changes (4 files)
-        PR #14 open (acme/site) — Feed
+        acme/site
+          PR #14 open — Feed
+        bingo
+          feed: 3 unpushed commits
+        site
+          uncommitted changes (4 files)
 
       2 quiet repos skipped
     TEXT
@@ -56,8 +60,8 @@ class RendererTest < Minitest::Test
 
     output = Spill::Renderer.render(report, now: NOW)
 
-    assert_includes output, "bingo · feed: not pushed yet (1 commit)"
-    assert_includes output, "site: uncommitted changes (1 file)"
+    assert_includes output, "feed: not pushed yet (1 commit)"
+    assert_includes output, "uncommitted changes (1 file)"
     assert_includes output, "1 quiet repo skipped"
   end
 
@@ -101,8 +105,8 @@ class RendererTest < Minitest::Test
 
     output = Spill::Renderer.render(report, now: NOW)
 
-    assert_includes output, "merged PR #12 (acme/site)\n"
-    assert_includes output, "PR #14 open (acme/site)\n"
+    assert_includes output, "merged PR #12\n"
+    assert_includes output, "PR #14 open\n"
   end
 
   def test_open_pr_age_annotation_shows_months_for_old_pr
@@ -118,7 +122,7 @@ class RendererTest < Minitest::Test
 
     output = Spill::Renderer.render(report, now: NOW)
 
-    assert_includes output, "PR #14 open (acme/site) — Feed · 7 months\n"
+    assert_includes output, "PR #14 open — Feed · 7 months\n"
   end
 
   def test_open_pr_without_opened_at_has_no_age_annotation
@@ -134,7 +138,7 @@ class RendererTest < Minitest::Test
 
     output = Spill::Renderer.render(report, now: NOW)
 
-    assert_includes output, "PR #14 open (acme/site) — Feed\n"
+    assert_includes output, "PR #14 open — Feed\n"
   end
 
   def test_open_pr_age_annotation_shows_today_for_fresh_pr
@@ -150,7 +154,7 @@ class RendererTest < Minitest::Test
 
     output = Spill::Renderer.render(report, now: NOW)
 
-    assert_includes output, "PR #14 open (acme/site) — Feed · today\n"
+    assert_includes output, "PR #14 open — Feed · today\n"
   end
 
   def test_open_pr_age_annotation_uses_singular_at_exact_boundaries
@@ -182,7 +186,7 @@ class RendererTest < Minitest::Test
 
     output = Spill::Renderer.render(report, now: NOW)
 
-    assert_includes output, "commented on #12 (acme/site) — Fix nav"
+    assert_includes output, "commented on #12 — Fix nav"
     assert_includes output, "\nExplored: mbailey/voicemode, nilbuild/git-standup\n"
   end
 
@@ -224,6 +228,6 @@ class RendererTest < Minitest::Test
       ],
       repos: [], window: WINDOW
     )
-    Spill::Renderer.render(report, now: NOW)[/PR #14 open \(acme\/site\) — Feed · (.+)\n/, 1]
+    Spill::Renderer.render(report, now: NOW)[/PR #14 open — Feed · (.+)\n/, 1]
   end
 end

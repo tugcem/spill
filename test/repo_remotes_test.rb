@@ -88,4 +88,25 @@ class RepoRemotesTest < Minitest::Test
       assert_empty slugs
     end
   end
+
+  def test_slug_map_maps_downcased_slug_to_local_basename
+    Dir.mktmpdir do |root|
+      repo = RepoFactory.init_repo(File.join(root, "proj"))
+      RepoFactory.git(repo, "remote", "add", "origin", "git@github.com:Acme/Proj.git")
+
+      map = Spill::RepoRemotes.slug_map([ repo ])
+
+      assert_equal({ "acme/proj" => "proj" }, map)
+    end
+  end
+
+  def test_slug_map_excludes_repos_with_no_github_remote
+    Dir.mktmpdir do |root|
+      repo = RepoFactory.init_repo(File.join(root, "proj"))
+
+      map = Spill::RepoRemotes.slug_map([ repo ])
+
+      assert_empty map
+    end
+  end
 end

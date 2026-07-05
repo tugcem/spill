@@ -8,7 +8,14 @@ module Spill
     HTTPS_PATTERN = %r{\Ahttps://github\.com/(?<slug>.+?)(?:\.git)?/?\z}
 
     def self.github_slugs(repo_paths)
-      repo_paths.filter_map { |path| slug_for(path) }.to_set
+      slug_map(repo_paths).keys.to_set
+    end
+
+    def self.slug_map(repo_paths)
+      repo_paths.each_with_object({}) do |path, map|
+        slug = slug_for(path)
+        map[slug] = File.basename(path) if slug
+      end
     end
 
     def self.slug_for(path)
