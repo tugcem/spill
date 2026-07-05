@@ -55,6 +55,28 @@ class ReportTest < Minitest::Test
     assert_includes report.notes, "GitHub: may be incomplete before Jul 1"
   end
 
+  def test_github_search_cap_adds_capped_note_without_dated_note
+    github = [ Spill::Event.new(source: :github, kind: :github_search_capped, repo: nil) ]
+
+    report = build(local: [], github: github, repos: [])
+
+    assert_includes report.notes, "GitHub: search results may be incomplete (capped at 100)"
+    refute(report.notes.any? { |note| note.include?("may be incomplete before") })
+  end
+
+  def test_both_truncation_kinds_produce_both_notes
+    github = [
+      Spill::Event.new(source: :github, kind: :github_search_capped, repo: nil),
+      Spill::Event.new(source: :github, kind: :github_truncated, repo: nil,
+                       extra: { oldest: Time.new(2026, 7, 1, 8) })
+    ]
+
+    report = build(local: [], github: github, repos: [])
+
+    assert_includes report.notes, "GitHub: may be incomplete before Jul 1"
+    assert_includes report.notes, "GitHub: search results may be incomplete (capped at 100)"
+  end
+
   def test_github_done_is_chronological
     t = Time.new(2026, 7, 3, 12)
     github = [

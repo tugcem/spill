@@ -49,6 +49,9 @@ module Spill
       notes << "GitHub: skipped (gh not available)" if github.nil?
       truncated = github_events.find { |e| e.kind == :github_truncated }
       notes << "GitHub: may be incomplete before #{truncated.extra[:oldest].strftime("%b %-d")}" if truncated
+      if github_events.any? { |e| e.kind == :github_search_capped }
+        notes << "GitHub: search results may be incomplete (capped at 100)"
+      end
       notes
     end
   end

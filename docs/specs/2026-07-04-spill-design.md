@@ -129,7 +129,10 @@ Rules:
 - The GitHub events fetch is capped at 3 pages / 300 events (API limit). If the
   window extends past the oldest fetched event, the report notes:
   `GitHub: may be incomplete before <date>`. The three search calls (open/merged/opened
-  PRs) are likewise capped at 100 results each; hitting that cap triggers the same note.
+  PRs) are likewise capped at 100 results each; hitting that cap triggers a separate,
+  undated note — `GitHub: search results may be incomplete (capped at 100)` — because
+  search results are relevance-sorted, so a capped page has no chronological boundary.
+  Both notes may appear together.
 - Open PRs in DOING carry an age annotation — `PR #804 open (org/repo) — Title · 7 months`
   — computed from the PR's `created_at` against render time. Doing itself stays an
   unwindowed snapshot (an open PR shows regardless of when it was opened); the age

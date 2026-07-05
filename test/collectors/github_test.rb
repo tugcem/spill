@@ -235,29 +235,43 @@ class GithubCollectorTest < Minitest::Test
     assert_nil open_pr.extra[:opened_at]
   end
 
-  def test_search_returning_exactly_100_items_flags_truncation
-    search = { "items" => Array.new(100) { |i|
-      { "number" => i, "title" => "PR #{i}", "updated_at" => (Time.now - (i * 60)).utc.iso8601,
-        "repository_url" => "https://api.github.com/repos/acme/proj" }
-    } }
-    collector = Spill::Collectors::Github.new(runner: runner_with(events: [], search: search))
+  def test_search_returning_exactly_100_items_flags_search_capped_not_truncated
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: [], search: search_items(100)))
 
-    truncated = collector.collect(window: WINDOW).find { |e| e.kind == :github_truncated }
+    result = collector.collect(window: WINDOW)
+    capped = result.find { |e| e.kind == :github_search_capped }
 
-    refute_nil truncated
-    assert_kind_of Time, truncated.extra[:oldest]
+    refute_nil capped
+    assert_empty capped.extra
+    assert_nil result.find { |e| e.kind == :github_truncated }
   end
 
-  def test_search_returning_99_items_does_not_flag_truncation
-    search = { "items" => Array.new(99) { |i|
-      { "number" => i, "title" => "PR #{i}", "updated_at" => (Time.now - (i * 60)).utc.iso8601,
-        "repository_url" => "https://api.github.com/repos/acme/proj" }
-    } }
-    collector = Spill::Collectors::Github.new(runner: runner_with(events: [], search: search))
+  def test_search_returning_99_items_flags_neither_capped_nor_truncated
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: [], search: search_items(99)))
 
-    truncated = collector.collect(window: WINDOW).find { |e| e.kind == :github_truncated }
+    result = collector.collect(window: WINDOW)
 
-    assert_nil truncated
+    assert_nil result.find { |e| e.kind == :github_search_capped }
+    assert_nil result.find { |e| e.kind == :github_truncated }
+  end
+
+  def test_multiple_capped_searches_emit_at_most_one_capped_event
+    collector = Spill::Collectors::Github.new(
+      runner: runner_with(events: [], search: search_items(100), merged_search: search_items(100),
+                          opened_search: search_items(100))
+    )
+
+    capped = collector.collect(window: WINDOW).select { |e| e.kind == :github_search_capped }
+
+    assert_equal 1, capped.size
+  end
+
+  def test_scoped_collect_keeps_search_capped_event
+    collector = Spill::Collectors::Github.new(runner: runner_with(events: [], search: search_items(100)))
+
+    result = collector.collect(window: WINDOW, scope: Set["some/other"])
+
+    refute_nil result.find { |e| e.kind == :github_search_capped }
   end
 
   def test_commented_events_across_event_types_on_same_thread_are_deduped_to_latest
@@ -366,6 +380,17 @@ class GithubCollectorTest < Minitest::Test
   end
 
   private
+
+  def search_items(count)
+    { "items" => Array.new(count) { |i|
+      { "number" => i, "title" => "PR #{i}",
+        "created_at" => (Time.now - (i * 60)).utc.iso8601,
+        "updated_at" => (Time.now - (i * 60)).utc.iso8601,
+        "pull_request" => { "merged_at" => (Time.now - (i * 60)).utc.iso8601 },
+        "closed_at" => (Time.now - (i * 60)).utc.iso8601,
+        "repository_url" => "https://api.github.com/repos/acme/proj" }
+    } }
+  end
 
   def gh_event(type, created_at, action:, **payload)
     { "type" => type, "created_at" => created_at, "repo" => { "name" => "acme/proj" },

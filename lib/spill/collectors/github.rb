@@ -43,6 +43,7 @@ module Spill
         events.concat(open_prs)
         events.concat(merged_prs)
         events.concat(opened_prs)
+        events = dedupe_search_capped(events)
         events << truncation_event(raw) if truncated?(raw, window)
         events = apply_scope(events, scope) unless scope.nil?
         events
@@ -52,9 +53,11 @@ module Spill
 
       private
 
+      SCOPE_EXEMPT_KINDS = %i[ starred github_truncated github_search_capped ].freeze
+
       def apply_scope(events, scope)
         events.select do |event|
-          event.kind == :starred || event.kind == :github_truncated || scope.include?(event.repo.to_s.downcase)
+          SCOPE_EXEMPT_KINDS.include?(event.kind) || scope.include?(event.repo.to_s.downcase)
         end
       end
 
@@ -130,7 +133,7 @@ module Spill
                     title: item["title"], ref: "##{item["number"]}",
                     timestamp: Time.parse(item["updated_at"]).localtime, extra: extra)
         end
-        events << maybe_truncation_event(items) { |item| item["updated_at"] }
+        events << search_cap_event(items)
         events.compact
       rescue JSON::ParserError
         nil
@@ -154,7 +157,7 @@ module Spill
                     repo: item["repository_url"].to_s.split("/repos/").last,
                     title: item["title"], ref: "##{item["number"]}", timestamp: time)
         end
-        events << maybe_truncation_event(items) { |item| item.dig("pull_request", "merged_at") || item["closed_at"] }
+        events << search_cap_event(items)
         events.compact
       rescue JSON::ParserError
         nil
@@ -175,19 +178,23 @@ module Spill
                     repo: item["repository_url"].to_s.split("/repos/").last,
                     title: item["title"], ref: "##{item["number"]}", timestamp: time)
         end
-        events << maybe_truncation_event(items) { |item| item["created_at"] }
+        events << search_cap_event(items)
         events.compact
       rescue JSON::ParserError
         nil
       end
 
-      def maybe_truncation_event(items)
+      # Search results are relevance-sorted, so a capped page has no chronological
+      # boundary — the cap event carries no date, unlike :github_truncated.
+      def search_cap_event(items)
         return nil unless items.size == SEARCH_PAGE_SIZE
 
-        oldest = items.filter_map { |item| yield(item) }.map { |raw| Time.parse(raw) }.min
-        return nil if oldest.nil?
+        Event.new(source: :github, kind: :github_search_capped, repo: nil)
+      end
 
-        Event.new(source: :github, kind: :github_truncated, repo: nil, extra: { oldest: oldest.localtime })
+      def dedupe_search_capped(events)
+        capped, rest = events.partition { |event| event.kind == :github_search_capped }
+        capped.empty? ? rest : rest << capped.first
       end
 
       def truncated?(raw, window)

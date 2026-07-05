@@ -87,14 +87,13 @@ module Spill
     def age(opened_at, now)
       days = (now - opened_at) / 86_400
       if days >= 365
-        years = (days / 365).floor
-        "#{years} #{years == 1 ? "year" : "years"}"
+        pluralize((days / 365).floor, "year")
       elsif days >= 30
-        "#{(days / 30).floor} months"
+        pluralize((days / 30).floor, "month")
       elsif days >= 7
-        "#{(days / 7).floor} weeks"
+        pluralize((days / 7).floor, "week")
       elsif days >= 1
-        "#{days.floor} days"
+        pluralize(days.floor, "day")
       else
         "today"
       end

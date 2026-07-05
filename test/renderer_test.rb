@@ -153,6 +153,20 @@ class RendererTest < Minitest::Test
     assert_includes output, "PR #14 open (acme/site) — Feed · today\n"
   end
 
+  def test_open_pr_age_annotation_uses_singular_at_exact_boundaries
+    assert_equal "1 day", age_suffix(NOW - (1 * 86_400))
+    assert_equal "1 week", age_suffix(NOW - (7 * 86_400))
+    assert_equal "1 month", age_suffix(NOW - (30 * 86_400))
+    assert_equal "1 year", age_suffix(NOW - (365 * 86_400))
+  end
+
+  def test_open_pr_age_annotation_stays_plural_above_boundaries
+    assert_equal "2 days", age_suffix(NOW - (2 * 86_400))
+    assert_equal "2 weeks", age_suffix(NOW - (14 * 86_400))
+    assert_equal "2 months", age_suffix(NOW - (60 * 86_400))
+    assert_equal "2 years", age_suffix(NOW - (730 * 86_400))
+  end
+
   def test_renders_commented_and_explored
     t = Time.new(2026, 7, 3, 10)
     report = Spill::Report.build(
@@ -199,5 +213,17 @@ class RendererTest < Minitest::Test
   def commit(repo, title, branch, time)
     Spill::Event.new(source: :local_git, kind: :commit, repo: repo, title: title,
                      ref: branch, timestamp: time, extra: { sha: "0" * 40 })
+  end
+
+  def age_suffix(opened_at)
+    report = Spill::Report.build(
+      local: [],
+      github: [
+        Spill::Event.new(source: :github, kind: :pr_open, repo: "acme/site", title: "Feed",
+                         ref: "#14", timestamp: Time.new(2026, 7, 3, 10), extra: { opened_at: opened_at })
+      ],
+      repos: [], window: WINDOW
+    )
+    Spill::Renderer.render(report, now: NOW)[/PR #14 open \(acme\/site\) — Feed · (.+)\n/, 1]
   end
 end
