@@ -255,6 +255,48 @@ class RendererTest < Minitest::Test
     refute_includes output, "Explored:"
   end
 
+  def test_summary_nil_leaves_output_unchanged
+    report = Spill::Report.build(local: [], github: nil, repos: [], window: WINDOW)
+
+    with_summary = Spill::Renderer.render(report, now: NOW, summary: nil)
+    without_summary_arg = Spill::Renderer.render(report, now: NOW)
+
+    assert_equal without_summary_arg, with_summary
+  end
+
+  def test_summary_is_inserted_after_the_header_plain
+    report = Spill::Report.build(local: [], github: nil, repos: [], window: WINDOW)
+
+    output = Spill::Renderer.render(report, now: NOW, summary: "Shipped the card page for bingo.")
+
+    expected = <<~TEXT
+      spill · Sat Jul 4 · today + yesterday
+
+      Shipped the card page for bingo.
+
+      Nothing to spill. 🍵
+
+      GitHub: skipped (gh not available)
+    TEXT
+    assert_equal expected, output
+  end
+
+  def test_summary_is_italic_when_color_enabled
+    report = Spill::Report.build(local: [], github: nil, repos: [], window: WINDOW)
+
+    output = Spill::Renderer.render(report, color: true, now: NOW, summary: "Shipped the card page.")
+
+    assert_includes output, "\e[3mShipped the card page.\e[0m"
+  end
+
+  def test_summary_multiline_is_emitted_as_is
+    report = Spill::Report.build(local: [], github: nil, repos: [], window: WINDOW)
+
+    output = Spill::Renderer.render(report, now: NOW, summary: "Line one.\nLine two.")
+
+    assert_includes output, "\nLine one.\nLine two.\n"
+  end
+
   private
 
   def commit(repo, title, branch, time)

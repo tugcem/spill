@@ -28,9 +28,12 @@ if a layer's tool or credential is missing, it silently drops out.
 | L2 | GitHub | `gh` CLI (authed) | Done: PRs merged, reviews given, issues closed · Doing: open PRs |
 | L3 | Deployments | `gh` (Actions/tags first; Fly/Heroku/Vercel adapters later) | Done: "shipped v2.3 to production" |
 | L4 | Issue trackers | GitHub Issues first; Notion/Asana/ClickUp adapters later | **Next**: what's assigned to you, sprint state |
-| L5 | LLM synthesis | an LLM API key | Natural-language past/present/future standup, incl. prediction from open branches + assigned issues |
+| L5 | LLM synthesis | macOS + on-device Apple Intelligence (`FoundationModels`) | A 2-4 sentence first-person standup summary above the report |
 
-**v0.1 (this build) ships L1 + L2.** L3–L5 are designed for, not built.
+**v0.1 (this build) ships L1 + L2.** L3 and L4 are designed for, not built.
+**v0.3.0 ships L5** — ahead of L3/L4 — via Apple's on-device Foundation Models
+framework rather than a cloud LLM API, keeping spill's zero-config, zero-network
+posture; see [ADR 0003](../adr/0003-on-device-narrator.md).
 
 ## Architecture
 
@@ -229,10 +232,11 @@ Minitest, strict TDD (red → green per unit):
 ## Release ladder
 
 - **v0.1 (this weekend):** L1 + L2, event model, terminal renderer
-- **v0.2:** L3 deployments (GitHub Actions deploy workflows + tags/releases); `~/.spill.yml`
-- **v0.3:** L4 GitHub Issues → "Next" section; tracker adapter interface
-- **v0.4:** more L4 adapters — Notion, Asana, ClickUp, Confluence
-- **v0.5:** L5 LLM renderer — past/present/future narrative, prediction from open
-  branches + assigned issues
+- **v0.2 (shipped):** colored output, teapot spinner (deployments/`~/.spill.yml` deferred)
+- **v0.3 (shipped):** L5 on-device AI summary via Apple Intelligence (`--no-ai` to skip) —
+  taken out of order because it needed zero new infrastructure beyond a renderer, unlike L3/L4
+- **v0.4:** L3 deployments (GitHub Actions deploy workflows + tags/releases); `~/.spill.yml`
+- **v0.5:** L4 GitHub Issues → "Next" section; tracker adapter interface, then more
+  L4 adapters (Notion, Asana, ClickUp, Confluence)
 - **Also v1.1-ish:** `--markdown` renderer; Homebrew tap (`brew install tugcemyalcin/spill/spill`);
   homebrew-core someday if it earns the stars

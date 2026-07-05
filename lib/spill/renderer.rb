@@ -2,8 +2,9 @@ module Spill
   module Renderer
     module_function
 
-    def render(report, color: false, now: Time.now)
+    def render(report, color: false, now: Time.now, summary: nil)
       lines = [ "#{style("spill", :bold, color)} · #{now.strftime("%a %b %-d")} · #{report.window.label}" ]
+      lines << "" << style(summary, :italic, color) unless summary.nil?
       if empty?(report)
         lines << "" << "Nothing to spill. 🍵"
       else
@@ -114,7 +115,8 @@ module Spill
       dim: "2",
       bold_green: "1;32",
       bold_yellow: "1;33",
-      bold_cyan: "1;36"
+      bold_cyan: "1;36",
+      italic: "3"
     }.freeze
 
     def style(text, kind, color)

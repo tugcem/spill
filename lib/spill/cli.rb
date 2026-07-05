@@ -3,13 +3,14 @@ require "optparse"
 module Spill
   class CLI
     def self.run(argv, stdout: $stdout)
-      options = { github: true }
+      options = { github: true, ai: true }
       early_exit = false
       parser = OptionParser.new do |opts|
         opts.banner = "Usage: spill [ROOT] [options]"
         opts.on("--since EXPR", 'Window start: "yesterday", "3 days ago", "2026-07-01"') { |v| options[:since] = v }
         opts.on("--author EMAIL", "Override the commit author for all repos") { |v| options[:author] = v }
         opts.on("--no-github", "Skip the GitHub layer") { options[:github] = false }
+        opts.on("--no-ai", "Skip the AI summary") { options[:ai] = false }
         opts.on("--version", "Print version") do
           stdout.puts Spill::VERSION
           early_exit = true
@@ -23,14 +24,25 @@ module Spill
       args = parser.parse(argv)
       return 0 if early_exit
 
+      now = Time.now
       spinner_enabled = $stderr.tty? && stdout.respond_to?(:tty?) && stdout.tty?
-      report = Spinner.around(enabled: spinner_enabled) { build_report(args, options) }
+      report, summary = Spinner.around(enabled: spinner_enabled) { build_report_and_summary(args, options, stdout, now) }
       color = stdout.respond_to?(:tty?) && stdout.tty? && ENV["NO_COLOR"].nil?
-      stdout.puts Renderer.render(report, color: color)
+      stdout.puts Renderer.render(report, color: color, now: now, summary: summary)
       0
     rescue OptionParser::ParseError, ArgumentError => e
       stdout.puts "spill: #{e.message}"
       0
+    end
+
+    def self.build_report_and_summary(args, options, stdout, now)
+      report = build_report(args, options)
+      summary = ai_enabled?(options, stdout) ? Narrator.narrate(Renderer.render(report, color: false, now: now)) : nil
+      [ report, summary ]
+    end
+
+    def self.ai_enabled?(options, stdout)
+      options[:ai] && Narrator.available? && stdout.respond_to?(:tty?) && stdout.tty?
     end
 
     def self.build_report(args, options)

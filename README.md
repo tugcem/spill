@@ -53,11 +53,24 @@ tokens, no config. No `gh`? Local git still works; the section is skipped.
     spill --since "3 days ago" # wider window ("yesterday", "2 weeks ago", "2026-07-01")
     spill --author me@work.com # override the git author
     spill --no-github          # local git only
+    spill --no-ai              # skip the AI summary
+
+## The AI summary
+
+On macOS, when Apple Intelligence's on-device model is available and you're
+running in a terminal, spill adds a short first-person summary — 2-4 sentences
+on what got done and what's in flight — right below the header. It runs
+entirely on-device via Apple's Foundation Models framework: no API keys, no
+network calls, nothing leaves your machine. The first run compiles a tiny
+Swift helper (needs Xcode Command Line Tools); after that it's cached and
+instant. Skip it with `--no-ai`. Everywhere else — Linux, piped output, the
+model unavailable, no Swift toolchain — spill is unaffected: the report
+renders exactly as before, silently.
 
 ## Roadmap
 
-Deployment detection, a NEXT section from issue trackers, and an LLM narrator —
-see [docs/specs](docs/specs/) for the layered design.
+Deployment detection and a NEXT section from issue trackers — see
+[docs/specs](docs/specs/) for the layered design.
 
 ## License
 

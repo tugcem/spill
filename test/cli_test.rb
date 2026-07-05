@@ -51,4 +51,56 @@ class CLITest < Minitest::Test
     assert_equal 0, status
     assert_includes out.string, "spill:"
   end
+
+  def test_no_ai_flag_is_accepted_and_never_touches_the_narrator
+    Dir.mktmpdir do |root|
+      RepoFactory.init_repo(File.join(root, "proj"))
+      out = StringIO.new
+
+      with_narrate_spy(raises: true) do
+        status = Spill::CLI.run([ root, "--no-github", "--no-ai" ], stdout: out)
+
+        assert_equal 0, status
+      end
+      refute_includes out.string, "\e[3m"
+    end
+  end
+
+  def test_stringio_stdout_is_not_a_tty_so_ai_never_runs_even_without_no_ai
+    Dir.mktmpdir do |root|
+      RepoFactory.init_repo(File.join(root, "proj"))
+      out = StringIO.new
+
+      with_narrate_spy(raises: true) do
+        status = Spill::CLI.run([ root, "--no-github" ], stdout: out)
+
+        assert_equal 0, status
+      end
+      refute_includes out.string, "\e[3m"
+    end
+  end
+
+  private
+
+  # Temporarily replaces Spill::Narrator.narrate with a spy that raises if called,
+  # proving the tty/--no-ai gates keep it from ever running under StringIO.
+  def with_narrate_spy(raises:)
+    original = Spill::Narrator.method(:narrate)
+    silence_warnings do
+      Spill::Narrator.define_singleton_method(:narrate) do |*_args, **_kwargs|
+        raise "Narrator.narrate should not be called" if raises
+      end
+    end
+    yield
+  ensure
+    silence_warnings { Spill::Narrator.define_singleton_method(:narrate, original) }
+  end
+
+  def silence_warnings
+    original_verbose = $VERBOSE
+    $VERBOSE = nil
+    yield
+  ensure
+    $VERBOSE = original_verbose
+  end
 end

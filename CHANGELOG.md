@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-05
+
+- An on-device AI summary (via Apple Intelligence / Foundation Models) now appears
+  between the header and the report on macOS, when the model is available and
+  stdout is a terminal: 2-4 first-person sentences on what was done and what's in
+  flight. Fully local, zero config, no network calls, no API keys. Opt out with
+  `--no-ai`. Absent everywhere else (Linux, piped output, model unavailable, no
+  Swift toolchain) — the report renders exactly as before, no error, no note.
+
 ## [0.2.0] - 2026-07-05
 
 - The report is now grouped per repo: commits and GitHub activity (merged/opened
