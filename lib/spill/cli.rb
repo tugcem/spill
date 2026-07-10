@@ -53,6 +53,10 @@ module Spill
 
       pairs = briefs.map(&:first).zip(summaries).reject { |_repo, text| text.nil? }
       pairs.empty? ? nil : pairs
+    rescue StandardError
+      # The summary is best-effort garnish — no failure in it may take down
+      # the report itself.
+      nil
     end
 
     def self.ai_enabled?(options, stdout)

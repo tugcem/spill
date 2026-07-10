@@ -41,6 +41,26 @@ class NarratorTest < Minitest::Test
     end
   end
 
+  def test_narrate_neutralizes_record_separators_inside_a_brief
+    with_fake_binary("#!/bin/sh\ncat\n") do |bin|
+      sneaky = "Commit: bad#{Spill::Narrator::RECORD_SEPARATOR}title"
+      result = Spill::Narrator.narrate([ sneaky, "second repo facts" ], binary: bin)
+
+      assert_equal [ "Commit: bad title", "second repo facts" ], result
+    end
+  end
+
+  def test_narrate_scrubs_invalid_utf8_inside_a_brief
+    with_fake_binary("#!/bin/sh\ncat\n") do |bin|
+      invalid = "Commit: bad \xFF byte".dup.force_encoding(Encoding::UTF_8)
+      result = Spill::Narrator.narrate([ invalid, "second repo facts" ], binary: bin)
+
+      refute_nil result, "expected invalid UTF-8 to be scrubbed, not to kill the summary"
+      assert_equal 2, result.size
+      assert_equal "second repo facts", result.last
+    end
+  end
+
   def test_narrate_flattens_newlines_inside_a_summary
     with_fake_binary("#!/bin/sh\ncat > /dev/null\nprintf 'line one\\nline two'\n") do |bin|
       result = Spill::Narrator.narrate([ "facts" ], binary: bin)

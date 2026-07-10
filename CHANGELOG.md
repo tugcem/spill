@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [0.4.0] - 2026-07-10
+## [0.4.0] - 2026-07-11
 
 - The AI summary is now key points, one per repo — `• repo — sentence` —
   instead of a single paragraph that blended every project together. Each

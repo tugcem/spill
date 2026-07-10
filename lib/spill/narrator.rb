@@ -27,7 +27,11 @@ module Spill
       return nil if bin.nil?
 
       timeout ||= [ 30 + (10 * briefs.size), 120 ].min
-      output = run(bin, briefs.join(RECORD_SEPARATOR), timeout)
+      # Fact text must not be able to forge block boundaries: a stray RS or
+      # invalid UTF-8 in a commit title would shift the count and silently
+      # kill every repo's summary, not just its own.
+      payload = briefs.map { |brief| brief.to_s.scrub(" ").tr(RECORD_SEPARATOR, " ") }
+      output = run(bin, payload.join(RECORD_SEPARATOR), timeout)
       return nil if output.nil?
 
       summaries = output.split(RECORD_SEPARATOR, -1).map { |part| flatten(clean(part)) }
@@ -160,9 +164,10 @@ module Spill
     end
 
     # Each key point renders on one bullet line — a model reply that sneaks
-    # in newlines must not be able to break the report layout.
+    # in newlines or control characters must not be able to break or
+    # overwrite the report layout.
     def flatten(str)
-      str&.gsub(/\s*\n\s*/, " ")
+      str&.gsub(/[[:space:][:cntrl:]]+/, " ")&.strip
     end
   end
 end

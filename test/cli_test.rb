@@ -80,7 +80,52 @@ class CLITest < Minitest::Test
     end
   end
 
+  def test_ai_summary_drops_only_the_repo_whose_block_failed
+    t = Time.new(2026, 7, 3, 10)
+    window = Spill::Window.new(since: Time.new(2026, 7, 3), label: "today + yesterday")
+    report = Spill::Report.build(
+      local: [
+        Spill::Event.new(source: :local_git, kind: :commit, repo: "newer",
+                         title: "Ship it", ref: "main", timestamp: t + 60),
+        Spill::Event.new(source: :local_git, kind: :commit, repo: "older",
+                         title: "Fix it", ref: "main", timestamp: t)
+      ],
+      github: [], repos: %w[newer older], window: window
+    )
+
+    with_narrate_returning([ "Shipped it.", nil ]) do
+      assert_equal [ [ "newer", "Shipped it." ] ], Spill::CLI.ai_summary(report)
+    end
+  end
+
+  def test_ai_summary_swallows_narrator_layer_errors
+    window = Spill::Window.new(since: Time.new(2026, 7, 3), label: "today + yesterday")
+    report = Spill::Report.build(
+      local: [
+        Spill::Event.new(source: :local_git, kind: :commit, repo: "proj",
+                         title: "Ship it", ref: "main", timestamp: Time.new(2026, 7, 3, 10))
+      ],
+      github: [], repos: %w[proj], window: window
+    )
+
+    with_narrate_returning(->(*) { raise "model exploded" }) do
+      assert_nil Spill::CLI.ai_summary(report)
+    end
+  end
+
   private
+
+  def with_narrate_returning(result)
+    original = Spill::Narrator.method(:narrate)
+    silence_warnings do
+      Spill::Narrator.define_singleton_method(:narrate) do |*args, **kwargs|
+        result.respond_to?(:call) ? result.call(*args, **kwargs) : result
+      end
+    end
+    yield
+  ensure
+    silence_warnings { Spill::Narrator.define_singleton_method(:narrate, original) }
+  end
 
   # Temporarily replaces Spill::Narrator.narrate with a spy that raises if called,
   # proving the tty/--no-ai gates keep it from ever running under StringIO.
