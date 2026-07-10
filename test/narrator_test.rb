@@ -1,5 +1,6 @@
 require "test_helper"
 require "tmpdir"
+require "fileutils"
 
 class NarratorTest < Minitest::Test
   def test_available_matches_darwin_platform
@@ -51,7 +52,93 @@ class NarratorTest < Minitest::Test
     end
   end
 
+  def test_compile_renames_temp_into_place_and_leaves_no_temp_file
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "narrator")
+      fake_swiftc = lambda do |tmp|
+        File.write(tmp, "binary contents")
+        true
+      end
+
+      with_stubbed_narrator_method(:swiftc, fake_swiftc) do
+        assert Spill::Narrator.compile(path)
+      end
+
+      assert_equal "binary contents", File.read(path)
+      assert_empty Dir.glob("#{path}.tmp*"), "expected the temp compile file to be renamed away"
+    end
+  end
+
+  def test_failed_compile_writes_marker_and_is_not_retried
+    Dir.mktmpdir do |cache_dir|
+      with_env("XDG_CACHE_HOME" => cache_dir) do
+        calls = 0
+        failing_swiftc = lambda do |_tmp|
+          calls += 1
+          false
+        end
+
+        with_stubbed_narrator_method(:swiftc, failing_swiftc) do
+          assert_nil Spill::Narrator.compiled_binary
+          assert_nil Spill::Narrator.compiled_binary
+        end
+
+        assert_equal 1, calls, "expected the failure marker to prevent a recompile"
+        assert File.exist?("#{Spill::Narrator.cache_path}.failed")
+      end
+    end
+  end
+
+  def test_swiftc_kills_a_hung_compiler_at_the_timeout
+    Dir.mktmpdir do |dir|
+      tmp = File.join(dir, "out")
+      with_stubbed_narrator_method(:compile_command, ->(_tmp) { [ "sleep", "5" ] }) do
+        start = Time.now
+        result = Spill::Narrator.swiftc(tmp, timeout: 0.2)
+        elapsed = Time.now - start
+
+        assert_equal false, result
+        assert elapsed < 4, "expected the compiler to be killed instead of waited out (took #{elapsed}s)"
+      end
+    end
+  end
+
+  def test_narrate_deletes_a_corrupt_cached_binary
+    Dir.mktmpdir do |cache_dir|
+      with_env("XDG_CACHE_HOME" => cache_dir) do
+        path = Spill::Narrator.cache_path
+        FileUtils.mkdir_p(File.dirname(path))
+        File.write(path, "not a real binary")
+        File.chmod(0o755, path)
+
+        # Exec of a corrupt binary raises platform-dependently (ENOEXEC on
+        # Linux, EBADARCH on macOS), so raise it deterministically here.
+        raise_exec_error = ->(*) { raise Errno::ENOEXEC }
+        with_stubbed_narrator_method(:run, raise_exec_error) do
+          assert_nil Spill::Narrator.narrate("hello")
+        end
+
+        refute File.exist?(path), "expected the corrupt cached binary to be removed"
+      end
+    end
+  end
+
   private
+
+  # Minitest 6 dropped minitest/mock, so swap the module's singleton method
+  # by hand and restore it after.
+  def with_stubbed_narrator_method(name, replacement)
+    mod = Spill::Narrator
+    original = mod.method(name)
+    mod.singleton_class.send(:remove_method, name)
+    mod.singleton_class.send(:define_method, name) do |*args, **kwargs, &block|
+      replacement.call(*args, **kwargs, &block)
+    end
+    yield
+  ensure
+    mod.singleton_class.send(:remove_method, name)
+    mod.singleton_class.send(:define_method, name, original)
+  end
 
   def with_fake_binary(script)
     Dir.mktmpdir do |dir|

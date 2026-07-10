@@ -2,7 +2,12 @@ require "fileutils"
 require "open3"
 
 module Spill
+  # Contract with narrator.swift: the report text goes in on stdin, the
+  # summary comes back on stdout, and any nonzero exit (model unavailable,
+  # refusal, crash) means "no summary" — the caller stays silent.
   module Narrator
+    COMPILE_TIMEOUT_SECONDS = 120
+
     module_function
 
     def available?
@@ -14,6 +19,12 @@ module Spill
       return nil if bin.nil?
 
       run(bin, text, timeout)
+    rescue SystemCallError
+      # A corrupt cached binary (interrupted compile, disk trouble) fails at
+      # exec — ENOEXEC, or EBADARCH for a truncated Mach-O — and would
+      # otherwise fail every run. Drop it so the next run recompiles.
+      FileUtils.rm_f(cache_path) if bin == cache_path
+      nil
     rescue StandardError
       nil
     end
@@ -21,6 +32,7 @@ module Spill
     def compiled_binary
       path = cache_path
       return path if File.exist?(path)
+      return nil if File.exist?(failure_marker(path))
 
       compile(path) ? path : nil
     end
@@ -30,16 +42,61 @@ module Spill
       File.join(cache_home, "spill", "narrator-#{Spill::VERSION}")
     end
 
+    def failure_marker(path)
+      "#{path}.failed"
+    end
+
     def swift_source
       File.join(__dir__, "narrator.swift")
     end
 
+    # Compiles to a temp path and renames into place, so a concurrent or
+    # interrupted run can never leave a half-written binary at the cache
+    # path. A failed compile leaves a marker so we don't pay for swiftc on
+    # every run; the marker is version-stamped along with the binary, so a
+    # new spill version retries.
     def compile(path)
       FileUtils.mkdir_p(File.dirname(path))
-      _out, _err, status = Open3.capture3("swiftc", swift_source, "-o", path)
-      status.success?
+      tmp = "#{path}.tmp#{Process.pid}"
+      compiled = begin
+        swiftc(tmp)
+      rescue StandardError
+        false
+      end
+      if compiled
+        File.rename(tmp, path)
+        true
+      else
+        FileUtils.rm_f(tmp)
+        FileUtils.touch(failure_marker(path))
+        false
+      end
     rescue StandardError
       false
+    end
+
+    def swiftc(tmp, timeout: COMPILE_TIMEOUT_SECONDS)
+      pid = Process.spawn(*compile_command(tmp), in: File::NULL, out: File::NULL, err: File::NULL)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+      until Process.waitpid(pid, Process::WNOHANG)
+        if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+          # KILL, not TERM: the compiler holds no state worth a graceful
+          # shutdown, and a hung swiftc must not hang spill.
+          begin
+            Process.kill("KILL", pid)
+          rescue Errno::ESRCH
+            nil
+          end
+          Process.waitpid(pid)
+          return false
+        end
+        sleep 0.05
+      end
+      Process.last_status.success?
+    end
+
+    def compile_command(tmp)
+      [ "swiftc", swift_source, "-o", tmp ]
     end
 
     def run(bin, text, timeout)
@@ -62,6 +119,9 @@ module Spill
       nil
     end
 
+    # Bare KILL on purpose: the helper is a one-shot stdin→stdout filter
+    # with nothing to clean up, and a wedged model process must not stall
+    # the report.
     def kill(wait_thr)
       Process.kill("KILL", wait_thr.pid)
     rescue Errno::ESRCH
