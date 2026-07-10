@@ -1,5 +1,18 @@
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-11
+
+- Each key point may now run to three sentences (120-token cap) — enough for
+  what got done and what's in flight, never a paragraph of filler.
+- Commit message bodies now feed the summary: each commit contributes its
+  body's first sentence (when it's short) alongside the subject, so a
+  cryptic "fix" subject still produces a meaningful update. Dense multi-line
+  bodies are left out — they measurably degrade the small model — trailers
+  (Co-Authored-By: and friends) are stripped, and the report display itself
+  is unchanged (subjects only).
+- Fact blocks sent to the model are capped at 3000 characters, ending with
+  an explicit "(and N more items not listed)" when a busy repo overflows.
+
 ## [0.4.0] - 2026-07-11
 
 - The AI summary is now key points, one per repo — `• repo — sentence` —

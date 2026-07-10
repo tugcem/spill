@@ -12,7 +12,7 @@ guard case .available = model.availability else {
 }
 let input = String(data: FileHandle.standardInput.readDataToEndOfFile(), encoding: .utf8) ?? ""
 let blocks = input.components(separatedBy: "\u{1E}")
-let options = GenerationOptions(temperature: 0.3, maximumResponseTokens: 70)
+let options = GenerationOptions(temperature: 0.3, maximumResponseTokens: 120)
 var summaries: [String] = []
 for block in blocks {
     let trimmed = block.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -23,16 +23,18 @@ for block in blocks {
     // A fresh session per repo keeps one repo's work from bleeding into
     // another repo's summary.
     let session = LanguageModelSession(instructions: """
-    You write standup updates. Reply with one short first-person sentence (two \
-    at most) that compresses the developer's listed activity. Items under \
-    FINISHED are done; items under IN PROGRESS are still open. Only restate \
-    what is listed — never invent anything, never repeat the list itself, and \
-    never describe unmerged work as merged. Be concrete; no vague phrases like \
-    "made improvements". No preamble, no repository name, no bullets.
+    You summarize a developer's activity as a standup update: at most three short \
+    first-person sentences of flowing prose. Never a list, never dashes, never \
+    quotation marks, and never any introduction — start directly with the first \
+    sentence of the update. Items under FINISHED are done work: past tense. Items \
+    under IN PROGRESS are still open: present tense. Only restate what is listed — \
+    never invent anything, never describe unmerged work as merged. Be concrete; \
+    no vague phrases like "made improvements". No repository name.
     """)
-    // The task lives in the prompt, not just the instructions: without it the
-    // small model sometimes continues the fact list instead of summarizing it.
-    let prompt = "Summarize this activity into one first-person standup sentence:\n\n" + trimmed
+    // The task lives in the prompt, not just the instructions, and "Summarize"
+    // is the load-bearing verb: without both, the small model sometimes
+    // continues or echoes the fact list instead of summarizing it.
+    let prompt = "Summarize this activity into a first-person standup update of at most three sentences:\n\n" + trimmed
     do {
         let response = try await session.respond(to: prompt, options: options)
         summaries.append(response.content

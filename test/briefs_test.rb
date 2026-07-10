@@ -102,6 +102,47 @@ class BriefsTest < Minitest::Test
     refute_includes block, "still open, not merged yet"
   end
 
+  def test_commit_body_contributes_only_its_first_sentence
+    t = Time.new(2026, 7, 3, 10)
+    event = Spill::Event.new(source: :local_git, kind: :commit, repo: "bingo",
+                             title: "Add card page", ref: "main", timestamp: t,
+                             extra: { body: "Explains why.\nAnd what changed." })
+    report = Spill::Report.build(local: [ event ], github: [], repos: %w[bingo], window: WINDOW)
+
+    block = Spill::Briefs.build(report).to_h["bingo"]
+
+    assert_includes block, "Commit: Add card page — Explains why."
+    refute_includes block, "And what changed."
+  end
+
+  def test_a_long_body_sentence_is_dropped_entirely
+    t = Time.new(2026, 7, 3, 10)
+    event = Spill::Event.new(source: :local_git, kind: :commit, repo: "bingo",
+                             title: "Add card page", ref: "main", timestamp: t,
+                             extra: { body: "#{"x" * 400}." })
+    report = Spill::Report.build(local: [ event ], github: [], repos: %w[bingo], window: WINDOW)
+
+    block = Spill::Briefs.build(report).to_h["bingo"]
+
+    assert_includes block, "Commit: Add card page"
+    refute_includes block, "—"
+    refute_includes block, "xxx"
+  end
+
+  def test_oversized_fact_list_is_capped_with_a_count
+    t = Time.new(2026, 7, 3, 10)
+    events = 60.times.map do |i|
+      Spill::Event.new(source: :local_git, kind: :commit, repo: "bingo",
+                       title: "Commit number #{i} #{"y" * 80}", ref: "main", timestamp: t + i)
+    end
+    report = Spill::Report.build(local: events, github: [], repos: %w[bingo], window: WINDOW)
+
+    block = Spill::Briefs.build(report).to_h["bingo"]
+
+    assert_operator block.length, :<=, Spill::Briefs::MAX_BLOCK_CHARS + 200
+    assert_match(/\(and \d+ more items not listed\)/, block)
+  end
+
   def test_empty_report_yields_no_briefs
     report = Spill::Report.build(local: [], github: [], repos: [], window: WINDOW)
 

@@ -17,6 +17,11 @@ module Spill
       commented: "Commented on"
     }.freeze
 
+    # The on-device model has a small context window; a block that outgrows
+    # this budget keeps its most recent facts and says how many were cut.
+    MAX_BODY_CHARS = 140
+    MAX_BLOCK_CHARS = 3000
+
     # Returns [ [ repo, block ], ... ] — done repos first (report order,
     # most recent first), then repos that only appear in doing.
     def build(report)
@@ -44,9 +49,17 @@ module Spill
 
     def block_for(finished_facts, doing_facts)
       lines = []
-      lines << "FINISHED" << finished_facts if finished_facts.any?
+      lines << "FINISHED" << capped(finished_facts) if finished_facts.any?
       lines << "IN PROGRESS" << doing_facts if doing_facts.any?
       lines.flatten.join("\n")
+    end
+
+    def capped(facts)
+      budget = MAX_BLOCK_CHARS
+      kept = facts.take_while { |fact| (budget -= fact.length + 1) >= 0 }
+      kept = facts.first(1) if kept.empty?
+      cut = facts.size - kept.size
+      cut.positive? ? kept + [ "(and #{cut} more items not listed)" ] : kept
     end
 
     # A PR that was opened in the window but is still open would appear
@@ -55,7 +68,7 @@ module Spill
     # in IN PROGRESS, as "Opened PR #N, awaiting merge".
     def finished_facts(entry, open_refs)
       commits = entry[:branches].flat_map do |branch|
-        branch[:commits].map { |commit| "Commit: #{commit.title}" }
+        branch[:commits].map { |commit| "Commit: #{commit.title}#{body_suffix(commit)}" }
       end
       github = entry[:github].filter_map do |event|
         next if event.kind == :pr_opened && open_refs[entry[:repo]]&.include?(normalize_ref(event.ref))
@@ -88,6 +101,19 @@ module Spill
       groups.to_h do |entry|
         [ entry[:repo], entry[key].select(&matcher).map { |event| normalize_ref(event.ref) } ]
       end
+    end
+
+    # The commit body carries the why behind the subject, but only its first
+    # sentence, and only when that sentence is short: dense multi-clause
+    # bodies measurably degrade the small model's summaries (it drifts into
+    # "fixed a bunch of stuff" or refuses), while a short body sentence is
+    # what turns a cryptic "fix" subject into a real update.
+    def body_suffix(commit)
+      body = commit.extra[:body].to_s.gsub(/\s+/, " ").strip
+      return "" if body.empty?
+
+      first_sentence = body.split(/(?<=[.!?])\s/, 2).first
+      first_sentence.length > MAX_BODY_CHARS ? "" : " — #{first_sentence}"
     end
 
     def normalize_ref(ref)

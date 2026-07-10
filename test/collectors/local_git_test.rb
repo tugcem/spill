@@ -24,6 +24,29 @@ class LocalGitCommitsTest < Minitest::Test
     end
   end
 
+  def test_captures_the_commit_body_without_trailers
+    Dir.mktmpdir do |dir|
+      repo = RepoFactory.init_repo(File.join(dir, "proj"))
+      message = "Add feature\n\nExplains why the feature exists\nand what changed.\n\n" \
+                "Co-Authored-By: Claude <c@a.com>\nSigned-off-by: Dev <d@e.com>"
+      RepoFactory.commit(repo, message, time: Time.now - 3_600)
+
+      event = collect(repo).first
+
+      assert_equal "Add feature", event.title
+      assert_equal "Explains why the feature exists\nand what changed.", event.extra[:body]
+    end
+  end
+
+  def test_body_is_nil_for_a_subject_only_commit
+    Dir.mktmpdir do |dir|
+      repo = RepoFactory.init_repo(File.join(dir, "proj"))
+      RepoFactory.commit(repo, "Just a subject", time: Time.now - 3_600)
+
+      assert_nil collect(repo).first.extra[:body]
+    end
+  end
+
   def test_attributes_commits_to_head_branch_first_without_duplicates
     Dir.mktmpdir do |dir|
       repo = RepoFactory.init_repo(File.join(dir, "proj"))

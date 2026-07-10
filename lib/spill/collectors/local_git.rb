@@ -5,6 +5,7 @@ module Spill
   module Collectors
     class LocalGit
       SEP = "\x1f"
+      RECORD_SEP = "\x1e"
 
       def initialize(repo_paths:, author: nil)
         @repo_paths = repo_paths
@@ -31,18 +32,30 @@ module Spill
         ordered_branches(path).flat_map do |branch|
           log = git(path, "log", branch, "--no-merges", "--author=#{email}",
                     "--since=#{window.since.iso8601}", "--date=iso-strict",
-                    "--pretty=format:%H#{SEP}%ad#{SEP}%s")
+                    "--pretty=format:%H#{SEP}%ad#{SEP}%s#{SEP}%b#{RECORD_SEP}")
           next [] if log.nil?
 
-          log.each_line(chomp: true).filter_map do |line|
-            sha, date, subject = line.split(SEP, 3)
-            next if sha.nil? || seen[sha]
+          log.split(RECORD_SEP).filter_map do |record|
+            sha, date, subject, body = record.strip.split(SEP, 4)
+            next unless sha&.match?(/\A\h{40}\z/) # a body containing our separators can't forge a record
+            next if seen[sha]
 
             seen[sha] = true
             Event.new(source: :local_git, kind: :commit, repo: name, title: subject,
-                      ref: branch, timestamp: Time.parse(date), extra: { sha: sha })
+                      ref: branch, timestamp: Time.parse(date),
+                      extra: { sha: sha, body: clean_body(body) })
           end
         end
+      end
+
+      # Trailers (Co-Authored-By:, Signed-off-by:, ...) are metadata, not
+      # prose — drop the final paragraph when every line in it is
+      # trailer-shaped.
+      def clean_body(body)
+        paragraphs = body.to_s.strip.split(/\n{2,}/)
+        paragraphs.pop if paragraphs.any? && paragraphs.last.lines.all? { |l| l.match?(/\A[\w-]+:\s/) }
+        text = paragraphs.join("\n\n").strip
+        text.empty? ? nil : text
       end
 
       def state_events(path, name)

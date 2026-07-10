@@ -58,8 +58,9 @@ tokens, no config. No `gh`? Local git still works; the section is skipped.
 ## The AI summary
 
 On macOS, when Apple Intelligence's on-device model is available and you're
-running in a terminal, spill adds key points right below the header — one
-short first-person sentence per repo:
+running in a terminal, spill adds key points right below the header — up to
+three short first-person sentences per repo, drawing on commit subjects and
+the first line of their bodies:
 
     • acme/website — Unified zone resolution and closed enforcement gaps;
       my API endpoints PR is still open.
