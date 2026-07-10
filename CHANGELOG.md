@@ -1,5 +1,16 @@
 ## [Unreleased]
 
+## [0.5.1] - 2026-07-11
+
+- The fact-block cap now keeps the newest facts: on a repo busy enough to
+  overflow the block (roughly 40+ commits in the window), it used to keep the
+  oldest commits and silently drop the newest ones and every GitHub fact
+  (merged PRs included) from the AI summary.
+- Repos using git's SHA-256 object format collect commits again — the commit
+  parser rejected 64-character hashes, so those repos showed up as quiet.
+- A commit log record with an unparseable date is now skipped on its own;
+  previously it could error out the whole report.
+
 ## [0.5.0] - 2026-07-11
 
 - Each key point may now run to three sentences (120-token cap) — enough for
