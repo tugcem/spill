@@ -37,8 +37,22 @@ module Spill
 
     def self.build_report_and_summary(args, options, stdout, now)
       report = build_report(args, options)
-      summary = ai_enabled?(options, stdout) ? Narrator.narrate(Renderer.render(report, color: false, now: now)) : nil
+      summary = ai_enabled?(options, stdout) ? ai_summary(report) : nil
       [ report, summary ]
+    end
+
+    # One key point per repo: Briefs decides what each repo's facts are,
+    # the narrator turns each block into a sentence, and pairing happens
+    # here by position — a repo whose block failed just drops out.
+    def self.ai_summary(report)
+      briefs = Briefs.build(report)
+      return nil if briefs.empty?
+
+      summaries = Narrator.narrate(briefs.map(&:last))
+      return nil if summaries.nil?
+
+      pairs = briefs.map(&:first).zip(summaries).reject { |_repo, text| text.nil? }
+      pairs.empty? ? nil : pairs
     end
 
     def self.ai_enabled?(options, stdout)

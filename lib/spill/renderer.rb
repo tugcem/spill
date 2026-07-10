@@ -4,7 +4,7 @@ module Spill
 
     def render(report, color: false, now: Time.now, summary: nil)
       lines = [ "#{style("spill", :bold, color)} · #{now.strftime("%a %b %-d")} · #{report.window.label}" ]
-      lines << "" << style(summary, :italic, color) unless summary.nil?
+      lines.concat(summary_lines(summary, color))
       if empty?(report)
         lines << "" << "Nothing to spill. 🍵"
       else
@@ -19,6 +19,17 @@ module Spill
 
     def empty?(report)
       report.done.empty? && report.doing.empty?
+    end
+
+    # summary is [ [ repo, sentence ], ... ] — one key point per repo.
+    def summary_lines(summary, color)
+      return [] if summary.nil? || summary.empty?
+
+      lines = [ "" ]
+      summary.each do |repo, text|
+        lines << "  #{style("•", :dim, color)} #{style(repo, :bold_cyan, color)} #{style("— #{text}", :italic, color)}"
+      end
+      lines
     end
 
     def done_lines(report, color)

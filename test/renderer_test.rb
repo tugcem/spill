@@ -264,15 +264,28 @@ class RendererTest < Minitest::Test
     assert_equal without_summary_arg, with_summary
   end
 
-  def test_summary_is_inserted_after_the_header_plain
+  def test_empty_summary_leaves_output_unchanged
     report = Spill::Report.build(local: [], github: nil, repos: [], window: WINDOW)
 
-    output = Spill::Renderer.render(report, now: NOW, summary: "Shipped the card page for bingo.")
+    with_summary = Spill::Renderer.render(report, now: NOW, summary: [])
+    without_summary_arg = Spill::Renderer.render(report, now: NOW)
+
+    assert_equal without_summary_arg, with_summary
+  end
+
+  def test_summary_renders_one_bullet_per_repo_after_the_header
+    report = Spill::Report.build(local: [], github: nil, repos: [], window: WINDOW)
+
+    output = Spill::Renderer.render(report, now: NOW, summary: [
+      [ "bingo", "Shipped the card page." ],
+      [ "acme/site", "Fixed the nav; the feed PR is still open." ]
+    ])
 
     expected = <<~TEXT
       spill · Sat Jul 4 · today + yesterday
 
-      Shipped the card page for bingo.
+        • bingo — Shipped the card page.
+        • acme/site — Fixed the nav; the feed PR is still open.
 
       Nothing to spill. 🍵
 
@@ -281,20 +294,14 @@ class RendererTest < Minitest::Test
     assert_equal expected, output
   end
 
-  def test_summary_is_italic_when_color_enabled
+  def test_summary_bullets_are_styled_when_color_enabled
     report = Spill::Report.build(local: [], github: nil, repos: [], window: WINDOW)
 
-    output = Spill::Renderer.render(report, color: true, now: NOW, summary: "Shipped the card page.")
+    output = Spill::Renderer.render(report, color: true, now: NOW,
+                                    summary: [ [ "bingo", "Shipped the card page." ] ])
 
-    assert_includes output, "\e[3mShipped the card page.\e[0m"
-  end
-
-  def test_summary_multiline_is_emitted_as_is
-    report = Spill::Report.build(local: [], github: nil, repos: [], window: WINDOW)
-
-    output = Spill::Renderer.render(report, now: NOW, summary: "Line one.\nLine two.")
-
-    assert_includes output, "\nLine one.\nLine two.\n"
+    assert_includes output, "\e[1;36mbingo\e[0m"
+    assert_includes output, "\e[3m— Shipped the card page.\e[0m"
   end
 
   private

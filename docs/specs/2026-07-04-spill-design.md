@@ -28,7 +28,7 @@ if a layer's tool or credential is missing, it silently drops out.
 | L2 | GitHub | `gh` CLI (authed) | Done: PRs merged, reviews given, issues closed · Doing: open PRs |
 | L3 | Deployments | `gh` (Actions/tags first; Fly/Heroku/Vercel adapters later) | Done: "shipped v2.3 to production" |
 | L4 | Issue trackers | GitHub Issues first; Notion/Asana/ClickUp adapters later | **Next**: what's assigned to you, sprint state |
-| L5 | LLM synthesis | macOS + on-device Apple Intelligence (`FoundationModels`) | A 2-4 sentence first-person standup summary above the report |
+| L5 | LLM synthesis | macOS + on-device Apple Intelligence (`FoundationModels`) | Key points above the report — one first-person sentence per repo (per-repo model calls over explicit fact blocks; v0.4.0, replacing v0.3.0's single blended paragraph) |
 
 **v0.1 (this build) ships L1 + L2.** L3 and L4 are designed for, not built.
 **v0.3.0 ships L5** — ahead of L3/L4 — via Apple's on-device Foundation Models

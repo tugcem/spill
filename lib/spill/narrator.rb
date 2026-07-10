@@ -2,11 +2,14 @@ require "fileutils"
 require "open3"
 
 module Spill
-  # Contract with narrator.swift: the report text goes in on stdin, the
-  # summary comes back on stdout, and any nonzero exit (model unavailable,
-  # refusal, crash) means "no summary" — the caller stays silent.
+  # Contract with narrator.swift: stdin carries one fact block per repo,
+  # joined by ASCII Record Separator (RS, \x1E); stdout returns one summary
+  # per block — same order, same count, same separator (a refused or failed
+  # block comes back empty). Any nonzero exit (model unavailable, crash)
+  # means "no summary" — the caller stays silent.
   module Narrator
     COMPILE_TIMEOUT_SECONDS = 120
+    RECORD_SEPARATOR = "\u001E".freeze
 
     module_function
 
@@ -14,11 +17,23 @@ module Spill
       RUBY_PLATFORM.include?("darwin")
     end
 
-    def narrate(text, timeout: 30, binary: nil)
+    # Takes the per-repo fact blocks and returns a parallel array of
+    # summaries (nil in a slot whose block failed), or nil if narration is
+    # unavailable or the helper's reply doesn't line up block-for-block.
+    def narrate(briefs, timeout: nil, binary: nil)
+      return nil if briefs.nil? || briefs.empty?
+
       bin = binary || compiled_binary
       return nil if bin.nil?
 
-      run(bin, text, timeout)
+      timeout ||= [ 30 + (10 * briefs.size), 120 ].min
+      output = run(bin, briefs.join(RECORD_SEPARATOR), timeout)
+      return nil if output.nil?
+
+      summaries = output.split(RECORD_SEPARATOR, -1).map { |part| flatten(clean(part)) }
+      return nil unless summaries.size == briefs.size
+
+      summaries.any? ? summaries : nil
     rescue SystemCallError
       # A corrupt cached binary (disk trouble, truncated Mach-O) can fail at
       # exec and would otherwise fail every run. Drop it — and any stale
@@ -110,7 +125,7 @@ module Spill
       stdin, stdout, stderr, wait_thr = Open3.popen3(bin)
       write_input(stdin, text)
       if wait_thr.join(timeout)
-        wait_thr.value.success? ? clean(stdout.read) : nil
+        wait_thr.value.success? ? stdout.read : nil
       else
         kill(wait_thr)
         nil
@@ -142,6 +157,12 @@ module Spill
 
       stripped = str.strip
       stripped.empty? ? nil : stripped
+    end
+
+    # Each key point renders on one bullet line — a model reply that sneaks
+    # in newlines must not be able to break the report layout.
+    def flatten(str)
+      str&.gsub(/\s*\n\s*/, " ")
     end
   end
 end

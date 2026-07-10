@@ -1,5 +1,18 @@
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-10
+
+- The AI summary is now key points, one per repo — `• repo — sentence` —
+  instead of a single paragraph that blended every project together. Each
+  repo is summarized by its own on-device model call from an explicit list
+  of its facts, so one repo's work can never bleed into another's line, no
+  repo can be dropped or invented, and "opened" can't turn into "merged".
+- Repos whose only activity is uncommitted changes or an unpushed branch
+  are no longer sent to the model at all (there is nothing to summarize —
+  and small models invent work when handed a bare file count).
+- Model calls are capped (70 tokens, low temperature) to keep each key
+  point to a sentence or two instead of a paragraph of filler.
+
 ## [0.3.0] - 2026-07-05
 
 - An on-device AI summary (via Apple Intelligence / Foundation Models) now appears

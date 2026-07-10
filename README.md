@@ -58,14 +58,22 @@ tokens, no config. No `gh`? Local git still works; the section is skipped.
 ## The AI summary
 
 On macOS, when Apple Intelligence's on-device model is available and you're
-running in a terminal, spill adds a short first-person summary — 2-4 sentences
-on what got done and what's in flight — right below the header. It runs
-entirely on-device via Apple's Foundation Models framework: no API keys, no
-network calls, nothing leaves your machine. The first run compiles a tiny
-Swift helper (needs Xcode Command Line Tools); after that it's cached and
-instant. Skip it with `--no-ai`. Everywhere else — Linux, piped output, the
-model unavailable, no Swift toolchain — spill is unaffected: the report
-renders exactly as before, silently.
+running in a terminal, spill adds key points right below the header — one
+short first-person sentence per repo:
+
+    • acme/website — Unified zone resolution and closed enforcement gaps;
+      my API endpoints PR is still open.
+    • spill — Hardened the narrator compile path with an atomic rename,
+      a timeout, and failure caching.
+
+Each repo gets its own model call over an explicit list of its facts, so
+projects are never blended together. It runs entirely on-device via Apple's
+Foundation Models framework: no API keys, no network calls, nothing leaves
+your machine. The first run compiles a tiny Swift helper (needs Xcode
+Command Line Tools); after that it's cached and instant. Skip it with
+`--no-ai`. Everywhere else — Linux, piped output, the model unavailable, no
+Swift toolchain — spill is unaffected: the report renders exactly as before,
+silently.
 
 ## Roadmap
 

@@ -10,25 +10,56 @@ class NarratorTest < Minitest::Test
   def test_narrate_returns_nil_when_binary_path_does_not_exist_and_compile_fails
     Dir.mktmpdir do |cache_dir|
       with_env("XDG_CACHE_HOME" => cache_dir, "PATH" => "/nonexistent-bin") do
-        result = Spill::Narrator.narrate("hello", binary: nil)
+        result = Spill::Narrator.narrate([ "hello" ], binary: nil)
 
         assert_nil result
       end
     end
   end
 
-  def test_narrate_happy_path_returns_stripped_output_of_fake_binary
+  def test_narrate_returns_one_summary_per_brief_in_order
     with_fake_binary("#!/bin/sh\ncat\n") do |bin|
-      result = Spill::Narrator.narrate("hello world\n", binary: bin)
+      result = Spill::Narrator.narrate([ "first repo facts\n", "second repo facts" ], binary: bin)
 
-      assert_equal "hello world", result
+      assert_equal [ "first repo facts", "second repo facts" ], result
+    end
+  end
+
+  def test_narrate_returns_nil_when_summary_count_does_not_match_brief_count
+    with_fake_binary("#!/bin/sh\ncat > /dev/null\nprintf 'only one summary'\n") do |bin|
+      result = Spill::Narrator.narrate([ "first", "second" ], binary: bin)
+
+      assert_nil result
+    end
+  end
+
+  def test_narrate_keeps_other_summaries_when_one_block_comes_back_empty
+    with_fake_binary("#!/bin/sh\ncat > /dev/null\nprintf 'ok\\036'\n") do |bin|
+      result = Spill::Narrator.narrate([ "first", "second" ], binary: bin)
+
+      assert_equal [ "ok", nil ], result
+    end
+  end
+
+  def test_narrate_flattens_newlines_inside_a_summary
+    with_fake_binary("#!/bin/sh\ncat > /dev/null\nprintf 'line one\\nline two'\n") do |bin|
+      result = Spill::Narrator.narrate([ "facts" ], binary: bin)
+
+      assert_equal [ "line one line two" ], result
+    end
+  end
+
+  def test_narrate_returns_nil_for_empty_briefs
+    with_fake_binary("#!/bin/sh\ncat\n") do |bin|
+      assert_nil Spill::Narrator.narrate([], binary: bin)
+      assert_nil Spill::Narrator.narrate(nil, binary: bin)
     end
   end
 
   def test_narrate_returns_nil_and_kills_process_on_timeout
     with_fake_binary("#!/bin/sh\nsleep 5\necho done\n") do |bin|
       start = Time.now
-      result = Spill::Narrator.narrate("hello", timeout: 0.2, binary: bin)
+      result = Spill::Narrator.narrate([ "hello" ], timeout: 0.2, binary: bin)
       elapsed = Time.now - start
 
       assert_nil result
@@ -38,7 +69,7 @@ class NarratorTest < Minitest::Test
 
   def test_narrate_returns_nil_on_nonzero_exit
     with_fake_binary("#!/bin/sh\necho unavailable 1>&2\nexit 2\n") do |bin|
-      result = Spill::Narrator.narrate("hello", binary: bin)
+      result = Spill::Narrator.narrate([ "hello" ], binary: bin)
 
       assert_nil result
     end
@@ -46,7 +77,7 @@ class NarratorTest < Minitest::Test
 
   def test_narrate_returns_nil_on_blank_output
     with_fake_binary("#!/bin/sh\ncat > /dev/null\necho ''\n") do |bin|
-      result = Spill::Narrator.narrate("hello", binary: bin)
+      result = Spill::Narrator.narrate([ "hello" ], binary: bin)
 
       assert_nil result
     end
@@ -133,7 +164,7 @@ class NarratorTest < Minitest::Test
         # Linux, EBADMACHO on macOS), so raise it deterministically here.
         raise_exec_error = ->(*) { raise Errno::ENOEXEC }
         with_stubbed_narrator_method(:run, raise_exec_error) do
-          assert_nil Spill::Narrator.narrate("hello")
+          assert_nil Spill::Narrator.narrate([ "hello" ])
         end
 
         refute File.exist?(path), "expected the corrupt cached binary to be removed"
