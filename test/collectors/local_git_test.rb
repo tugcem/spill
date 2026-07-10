@@ -47,6 +47,35 @@ class LocalGitCommitsTest < Minitest::Test
     end
   end
 
+  def test_collects_commits_from_a_sha256_repo
+    Dir.mktmpdir do |dir|
+      repo = File.join(dir, "proj")
+      FileUtils.mkdir_p(repo)
+      RepoFactory.run("git", "init", "-q", "-b", "main", "--object-format=sha256", repo)
+      RepoFactory.git(repo, "config", "user.email", "dev@example.com")
+      RepoFactory.git(repo, "config", "user.name", "Dev")
+      RepoFactory.commit(repo, "Fresh work", time: Time.now - 3_600)
+
+      events = collect(repo)
+
+      assert_equal [ "Fresh work" ], events.map(&:title)
+      assert_match(/\A\h{64}\z/, events.first.extra[:sha])
+    end
+  end
+
+  def test_a_forged_record_in_a_commit_body_is_skipped_without_killing_the_report
+    Dir.mktmpdir do |dir|
+      repo = RepoFactory.init_repo(File.join(dir, "proj"))
+      forged = "\u001E#{"a" * 40}\u001Fnot-a-date\u001FFORGED SUBJECT\u001F"
+      RepoFactory.commit(repo, "Honest subject\n\nBody smuggling#{forged}nothing.",
+                         time: Time.now - 3_600)
+
+      events = collect(repo)
+
+      assert_equal [ "Honest subject" ], events.map(&:title)
+    end
+  end
+
   def test_attributes_commits_to_head_branch_first_without_duplicates
     Dir.mktmpdir do |dir|
       repo = RepoFactory.init_repo(File.join(dir, "proj"))

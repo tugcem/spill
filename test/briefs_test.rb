@@ -129,18 +129,23 @@ class BriefsTest < Minitest::Test
     refute_includes block, "xxx"
   end
 
-  def test_oversized_fact_list_is_capped_with_a_count
+  def test_oversized_fact_list_keeps_newest_commits_and_github_facts
     t = Time.new(2026, 7, 3, 10)
     events = 60.times.map do |i|
       Spill::Event.new(source: :local_git, kind: :commit, repo: "bingo",
                        title: "Commit number #{i} #{"y" * 80}", ref: "main", timestamp: t + i)
     end
-    report = Spill::Report.build(local: events, github: [], repos: %w[bingo], window: WINDOW)
+    merged = Spill::Event.new(source: :github, kind: :pr_merged, repo: "bingo",
+                              title: "Big feature", ref: "#9", timestamp: t + 100)
+    report = Spill::Report.build(local: events, github: [ merged ], repos: %w[bingo], window: WINDOW)
 
     block = Spill::Briefs.build(report).to_h["bingo"]
 
     assert_operator block.length, :<=, Spill::Briefs::MAX_BLOCK_CHARS + 200
-    assert_match(/\(and \d+ more items not listed\)/, block)
+    assert_match(/\(and \d+ earlier items not listed\)/, block)
+    assert_includes block, "Merged PR #9: Big feature"
+    assert_includes block, "Commit number 59"
+    refute_includes block, "Commit number 0 "
   end
 
   def test_empty_report_yields_no_briefs

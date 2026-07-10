@@ -18,7 +18,9 @@ module Spill
     }.freeze
 
     # The on-device model has a small context window; a block that outgrows
-    # this budget keeps its most recent facts and says how many were cut.
+    # this budget keeps the facts at the end of the list — the newest
+    # commits and all the GitHub facts, which follow them — and says how
+    # many earlier ones were cut.
     MAX_BODY_CHARS = 140
     MAX_BLOCK_CHARS = 3000
 
@@ -56,10 +58,10 @@ module Spill
 
     def capped(facts)
       budget = MAX_BLOCK_CHARS
-      kept = facts.take_while { |fact| (budget -= fact.length + 1) >= 0 }
-      kept = facts.first(1) if kept.empty?
+      kept = facts.reverse.take_while { |fact| (budget -= fact.length + 1) >= 0 }.reverse
+      kept = facts.last(1) if kept.empty?
       cut = facts.size - kept.size
-      cut.positive? ? kept + [ "(and #{cut} more items not listed)" ] : kept
+      cut.positive? ? [ "(and #{cut} earlier items not listed)" ] + kept : kept
     end
 
     # A PR that was opened in the window but is still open would appear

@@ -37,12 +37,19 @@ module Spill
 
           log.split(RECORD_SEP).filter_map do |record|
             sha, date, subject, body = record.strip.split(SEP, 4)
-            next unless sha&.match?(/\A\h{40}\z/) # a body containing our separators can't forge a record
+            # SHA-1 or SHA-256 repos; a body containing our separators makes
+            # a malformed record, not a forged commit — skip, never raise.
+            next unless sha&.match?(/\A(?:\h{40}|\h{64})\z/)
             next if seen[sha]
 
+            timestamp = begin
+              Time.parse(date)
+            rescue ArgumentError, TypeError
+              next
+            end
             seen[sha] = true
             Event.new(source: :local_git, kind: :commit, repo: name, title: subject,
-                      ref: branch, timestamp: Time.parse(date),
+                      ref: branch, timestamp: timestamp,
                       extra: { sha: sha, body: clean_body(body) })
           end
         end
