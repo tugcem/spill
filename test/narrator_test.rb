@@ -89,6 +89,23 @@ class NarratorTest < Minitest::Test
     end
   end
 
+  def test_successful_compile_clears_a_stale_failure_marker
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "narrator")
+      FileUtils.touch("#{path}.failed")
+      fake_swiftc = lambda do |tmp|
+        File.write(tmp, "binary contents")
+        true
+      end
+
+      with_stubbed_narrator_method(:swiftc, fake_swiftc) do
+        assert Spill::Narrator.compile(path)
+      end
+
+      refute File.exist?("#{path}.failed"), "expected a successful compile to clear the failure marker"
+    end
+  end
+
   def test_swiftc_kills_a_hung_compiler_at_the_timeout
     Dir.mktmpdir do |dir|
       tmp = File.join(dir, "out")
@@ -110,15 +127,17 @@ class NarratorTest < Minitest::Test
         FileUtils.mkdir_p(File.dirname(path))
         File.write(path, "not a real binary")
         File.chmod(0o755, path)
+        FileUtils.touch("#{path}.failed")
 
         # Exec of a corrupt binary raises platform-dependently (ENOEXEC on
-        # Linux, EBADARCH on macOS), so raise it deterministically here.
+        # Linux, EBADMACHO on macOS), so raise it deterministically here.
         raise_exec_error = ->(*) { raise Errno::ENOEXEC }
         with_stubbed_narrator_method(:run, raise_exec_error) do
           assert_nil Spill::Narrator.narrate("hello")
         end
 
         refute File.exist?(path), "expected the corrupt cached binary to be removed"
+        refute File.exist?("#{path}.failed"), "expected the failure marker to be removed with the binary"
       end
     end
   end

@@ -20,10 +20,14 @@ module Spill
 
       run(bin, text, timeout)
     rescue SystemCallError
-      # A corrupt cached binary (interrupted compile, disk trouble) fails at
-      # exec — ENOEXEC, or EBADARCH for a truncated Mach-O — and would
-      # otherwise fail every run. Drop it so the next run recompiles.
-      FileUtils.rm_f(cache_path) if bin == cache_path
+      # A corrupt cached binary (disk trouble, truncated Mach-O) can fail at
+      # exec and would otherwise fail every run. Drop it — and any stale
+      # failure marker that would block the recompile — so the next run
+      # starts fresh.
+      if bin == cache_path
+        FileUtils.rm_f(cache_path)
+        FileUtils.rm_f(failure_marker(cache_path))
+      end
       nil
     rescue StandardError
       nil
@@ -65,6 +69,9 @@ module Spill
       end
       if compiled
         File.rename(tmp, path)
+        # A marker from a concurrent failed compile must not outlive a
+        # working binary — it would block recompiles after a self-heal.
+        FileUtils.rm_f(failure_marker(path))
         true
       else
         FileUtils.rm_f(tmp)
